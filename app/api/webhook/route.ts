@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { WebhookEvent, validateSignature } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
-import { prisma } from "@/lib/prisma";
+import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
 import { getRoutes } from "@/lib/maps";
 import { calcCo2Saved, calcPoints } from "@/lib/carbon";
@@ -31,6 +31,7 @@ async function handleEvent(event: WebhookEvent) {
   const replyToken = event.replyToken;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const msg = (event as any).message as { type: string; latitude?: number; longitude?: number; address?: string; title?: string; text?: string };
+  const prisma = await getPrisma();
 
   // ดึงหรือสร้าง user
   let user = await prisma.user.findUnique({ where: { lineUserId } });
