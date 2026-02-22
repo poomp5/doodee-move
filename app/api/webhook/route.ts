@@ -49,7 +49,7 @@ async function handleEvent(event: WebhookEvent) {
   const msg = (event as any).message as { type: string; latitude?: number; longitude?: number; address?: string; title?: string; text?: string };
 
   try {
-    const prisma = await getPrisma();
+    const prisma = getPrisma();
 
     // ดึงหรือสร้าง user
     let user = await prisma.user.findUnique({ where: { lineUserId } });
@@ -176,7 +176,9 @@ async function handleEvent(event: WebhookEvent) {
       text: "สวัสดีครับ! 🌿 Doodee Move\n\nส่งตำแหน่งปัจจุบันของคุณมาเพื่อเริ่มค้นหาเส้นทางสีเขียว\n\nพิมพ์ \"แต้ม\" เพื่อดูแต้มรักษ์โลกของคุณ",
     }]);
   } catch (error) {
-    console.error("[webhook] Event processing failed", { lineUserId, error });
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : undefined;
+    console.error("[webhook] Event processing failed", { lineUserId, errMsg, errStack });
     await safeReply(replyToken, [{
       type: "text",
       text: "ขออภัย ระบบมีปัญหาชั่วคราว ลองใหม่อีกครั้งในอีกสักครู่ครับ",

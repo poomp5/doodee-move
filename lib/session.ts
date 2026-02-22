@@ -3,7 +3,7 @@ import { getPrisma } from "./prisma";
 export type SessionStep = "IDLE" | "WAITING_DESTINATION";
 
 export async function getSession(lineUserId: string) {
-  const prisma = await getPrisma();
+  const prisma = getPrisma();
   return prisma.userSession.findUnique({ where: { lineUserId } });
 }
 
@@ -13,7 +13,7 @@ export async function setSession(
   originLat?: number,
   originLng?: number
 ) {
-  const prisma = await getPrisma();
+  const prisma = getPrisma();
   return prisma.userSession.upsert({
     where: { lineUserId },
     update: { step, originLat, originLng },
@@ -22,7 +22,7 @@ export async function setSession(
 }
 
 export async function clearSession(lineUserId: string) {
-  const prisma = await getPrisma();
+  const prisma = getPrisma();
   return prisma.userSession.upsert({
     where: { lineUserId },
     update: { step: "IDLE", originLat: null, originLng: null },
