@@ -65,7 +65,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               contents: [
                 {
                   type: "image",
-                  url: "https://cdn-icons-png.flaticon.com/512/3597/3597531.png",
+                  url: "https://i.ibb.co/SkMDw7s/world.png",
                   size: "sm",
                   aspectRatio: "1:1",
                   flex: 0,
