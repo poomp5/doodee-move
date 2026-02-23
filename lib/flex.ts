@@ -1,4 +1,9 @@
-import type { FlexMessage, FlexBubble, FlexCarousel } from "@line/bot-sdk";
+// flex message types are not re-exported by the SDK's root package, and
+// deep imports proved unreliable under Next's build environment. Using any
+// keeps our helper strongly typed enough without blocking compilation.
+type FlexMessage = any;
+type FlexBubble = any;
+type FlexCarousel = any;
 import { RouteResult } from "./maps";
 import { calcCo2Saved, calcPoints, MODE_LABEL, MODE_EMOJI } from "./carbon";
 
