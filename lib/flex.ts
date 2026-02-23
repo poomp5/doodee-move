@@ -64,10 +64,10 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               cornerRadius: "6px",
               contents: [
                 {
-                  type: "text",
-                  text: "d",
+                  type: "image",
+                  url: "https://i.ibb.co/PZZybFhG/distance.png",
                   size: "lg",
-                  weight: "bold",
+                  aspectRatio: "1:1",
                   color: primaryColor,
                   align: "center",
                   margin: "none",
