@@ -275,10 +275,10 @@ export function buildRouteDetailFlex(
       layout: "baseline",
       spacing: "xs",
       contents: [
-        { type: "text", text: "ระยะทาง:", size: "xs", color: "#999" },
-        { type: "text", text: `${route.distanceKm.toFixed(1)} km`, size: "xs", weight: "bold", color: "#333" },
-        { type: "text", text: "เวลา:", size: "xs", color: "#999", margin: "md" },
-        { type: "text", text: `~${route.durationMin} นาที`, size: "xs", weight: "bold", color: "#333" },
+        { type: "text", text: "ระยะทาง:", size: "xs", color: "#999999" },
+        { type: "text", text: `${route.distanceKm.toFixed(1)} km`, size: "xs", weight: "bold", color: "#333333" },
+        { type: "text", text: "เวลา:", size: "xs", color: "#999999", margin: "md" },
+        { type: "text", text: `~${route.durationMin} นาที`, size: "xs", weight: "bold", color: "#333333" },
       ],
     },
     {
@@ -286,7 +286,7 @@ export function buildRouteDetailFlex(
       layout: "baseline",
       spacing: "xs",
       contents: [
-        { type: "text", text: "CO₂ ประหยัด:", size: "xs", color: "#999" },
+        { type: "text", text: "CO₂ ประหยัด:", size: "xs", color: "#999999" },
         { type: "text", text: `${co2SavedKg} kg`, size: "xs", weight: "bold", color: primaryColor },
       ],
     },
