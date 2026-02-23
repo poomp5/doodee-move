@@ -7,7 +7,7 @@ type FlexCarousel = any;
 import { RouteResult } from "./maps";
 import { calcCo2Saved, calcPoints, MODE_LABEL, MODE_EMOJI } from "./carbon";
 
-function buildRouteBubble(route: RouteResult, userTotalPoints: number): FlexBubble {
+function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: number): FlexBubble {
   const co2Saved = calcCo2Saved(route.distanceKm, route.mode);
   const points = calcPoints(co2Saved);
   const emoji = MODE_EMOJI[route.mode] ?? "🚗";
@@ -125,6 +125,15 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number): FlexBubb
           color: "#888888",
           align: "center",
         },
+        {
+          type: "button",
+          action: {
+            type: "postback",
+            label: "เลือกเส้นทาง",
+            data: `route=${index}`,
+          },
+          margin: "sm",
+        },
       ],
       paddingAll: "8px",
     },
@@ -136,7 +145,7 @@ export function buildRoutesFlexMessage(
   userTotalPoints: number,
   destLabel: string
 ): FlexMessage {
-  const bubbles = routes.slice(0, 5).map((r) => buildRouteBubble(r, userTotalPoints));
+  const bubbles = routes.slice(0, 5).map((r, i) => buildRouteBubble(r, userTotalPoints, i));
 
   return {
     type: "flex",

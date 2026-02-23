@@ -46,6 +46,11 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleEvent(event: WebhookEvent) {
+  // postback events are used for the user choosing a route from the flex card
+  if (event.type === "postback") {
+    return handlePostback(event);
+  }
+
   if (event.type !== "message") return;
   if (!event.source.userId) return;
 
@@ -74,7 +79,12 @@ async function handleEvent(event: WebhookEvent) {
 
     // --- รับ Location (origin) ---
     if (msg.type === "location") {
-      await setSession(lineUserId, "WAITING_DESTINATION", msg.latitude!, msg.longitude!);
+      await setSession({
+        lineUserId,
+        step: "WAITING_DESTINATION",
+        originLat: msg.latitude!,
+        originLng: msg.longitude!,
+      });
       await safeReply(replyToken, [
         {
           type: "text",
@@ -118,43 +128,20 @@ async function handleEvent(event: WebhookEvent) {
         return;
       }
 
-      // บันทึก trip ของเส้นทางที่ดีที่สุด (CO2 ต่ำสุด)
-      const bestRoute = [...routes].sort((a, b) => {
-        const co2A = calcCo2Saved(a.distanceKm, a.mode);
-        const co2B = calcCo2Saved(b.distanceKm, b.mode);
-        return co2B - co2A; // เรียงจาก CO2 ประหยัดมากสุด
-      })[0];
-
-      const co2Saved = calcCo2Saved(bestRoute.distanceKm, bestRoute.mode);
-      const points = calcPoints(co2Saved);
-
-      await prisma.trip.create({
-        data: {
-          userId: user.id,
-          originLat,
-          originLng,
-          destLat: destLat!,
-          destLng: destLng!,
-          destLabel,
-          mode: bestRoute.mode,
-          distanceKm: bestRoute.distanceKm,
-          co2Saved,
-          points,
-        },
-      });
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          totalPoints: { increment: points },
-          totalCo2Saved: { increment: co2Saved },
-        },
+      // store session state so we can record the trip when the user picks one
+      await setSession({
+        lineUserId,
+        step: "AWAITING_ROUTE",
+        originLat,
+        originLng,
+        destLat,
+        destLng,
+        destLabel,
+        pendingRoutes: routes,
       });
 
-      const updatedUser = await prisma.user.findUnique({ where: { id: user.id } });
-      await clearSession(lineUserId);
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const flexMsg = buildRoutesFlexMessage(routes, updatedUser!.totalPoints - points, destLabel) as any;
+      // send the flex carousel with actions; user will choose explicitly
+      const flexMsg = buildRoutesFlexMessage(routes, user.totalPoints, destLabel) as any;
       await safeReply(
         replyToken,
         [flexMsg],
@@ -189,6 +176,67 @@ async function handleEvent(event: WebhookEvent) {
       type: "text",
       text: "ขออภัย ระบบมีปัญหาชั่วคราว ลองใหม่อีกครั้งในอีกสักครู่ครับ",
     }]);
+  }
+}
+
+async function handlePostback(event: WebhookEvent) {
+  if (!event.source.userId) return;
+  const lineUserId = event.source.userId;
+  const data = event.postback?.data ?? "";
+
+  if (data.startsWith("route=")) {
+    const idx = parseInt(data.slice("route=".length), 10);
+    const session = await getSession(lineUserId);
+    if (!session || !session.pendingRoutes) return;
+    const routes: any[] = session.pendingRoutes as any[];
+    const chosen = routes[idx];
+    if (!chosen) return;
+
+    const co2Saved = calcCo2Saved(chosen.distanceKm, chosen.mode);
+    const points = calcPoints(co2Saved);
+
+    const prisma = getPrisma();
+    // ensure user exists (should be, but just in case)
+    let user = await prisma.user.findUnique({ where: { lineUserId } });
+    if (!user) {
+      // create minimal user record
+      user = await prisma.user.create({ data: { lineUserId, displayName: "ผู้ใช้" } });
+    }
+
+    await prisma.trip.create({
+      data: {
+        userId: user.id,
+        originLat: session.originLat!,
+        originLng: session.originLng!,
+        destLat: session.destLat!,
+        destLng: session.destLng!,
+        destLabel: session.destLabel ?? "",
+        mode: chosen.mode,
+        distanceKm: chosen.distanceKm,
+        co2Saved,
+        points,
+      },
+    });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        totalPoints: { increment: points },
+        totalCo2Saved: { increment: co2Saved },
+      },
+    });
+    const updatedUser = await prisma.user.findUnique({ where: { id: user.id } });
+
+    await clearSession(lineUserId);
+
+    // reply with confirmation and updated score
+    await safeReply(event.replyToken, [
+      {
+        type: "text",
+        text: `คุณเลือกเส้นทาง ${chosen.mode} (${chosen.distanceKm.toFixed(1)} km)
+คุณได้รับ ${points} แต้ม
+ยอดรวมปัจจุบัน: ${updatedUser?.totalPoints} แต้ม`,
+      },
+    ]);
   }
 }
 

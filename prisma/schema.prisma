@@ -36,11 +36,15 @@ model Trip {
 }
 
 model UserSession {
-  id          String   @id @default(cuid())
-  lineUserId  String   @unique
-  user        User     @relation(fields: [lineUserId], references: [lineUserId])
-  step        String   // IDLE, WAITING_DESTINATION
-  originLat   Float?
-  originLng   Float?
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  lineUserId    String   @unique
+  user          User     @relation(fields: [lineUserId], references: [lineUserId])
+  step          String   // IDLE, WAITING_DESTINATION, AWAITING_ROUTE
+  originLat     Float?
+  originLng     Float?
+  destLat       Float?
+  destLng       Float?
+  destLabel     String?
+  pendingRoutes Json?    // stores serialized route options while waiting for selection
+  updatedAt     DateTime @updatedAt
 }
