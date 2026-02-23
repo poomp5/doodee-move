@@ -221,7 +221,9 @@ export function buildRoutesFlexMessage(
   routes: RouteResult[],
   destLabel: string
 ): FlexMessage {
-  const bubbles = routes.slice(0, 5).map((r, i) => buildRouteBubble(r, i));
+  // sort by estimated duration ascending so fastest options appear first
+  const sorted = routes.slice().sort((a, b) => a.durationMin - b.durationMin);
+  const bubbles = sorted.slice(0, 5).map((r, i) => buildRouteBubble(r, i));
 
   return {
     type: "flex",
