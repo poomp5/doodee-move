@@ -143,7 +143,7 @@ function buildRouteBubble(route: RouteResult, index: number): FlexBubble {
             },
           ],
         },
-        { type: "separator", margin: "md", color: "#e9e9e9" },
+        { type: "separator", margin: "md" },
         {
           type: "box",
           layout: "horizontal",
