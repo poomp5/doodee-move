@@ -1,33 +1,32 @@
 import { getPrisma } from "@/lib/prisma";
-import { Users, Star, Leaf, TrendingUp, Car, Calendar } from "lucide-react";
+import { Users, Leaf, TrendingUp, Car, Calendar, Route } from "lucide-react";
 
 export default async function Dashboard() {
   const prisma = getPrisma();
 
-  const [topUsers, totals, recentTrips] = await Promise.all([
+  const [topUsers, totals, recentTrips, totalTrips] = await Promise.all([
     prisma.user.findMany({
-      orderBy: { totalPoints: "desc" },
+      orderBy: { totalCo2Saved: "desc" },
       take: 5,
       select: {
         id: true,
         displayName: true,
-        totalPoints: true,
         totalCo2Saved: true,
       },
     }),
     prisma.user.aggregate({
       _count: { id: true },
-      _sum: { totalPoints: true, totalCo2Saved: true },
+      _sum: { totalCo2Saved: true },
     }),
     prisma.trip.findMany({
       orderBy: { createdAt: "desc" },
       take: 10,
       include: { user: { select: { displayName: true } } },
     }),
+    prisma.trip.count(),
   ]);
 
   const totalUsers = totals._count?.id ?? 0;
-  const totalPoints = totals._sum?.totalPoints ?? 0;
   const totalCo2Saved = totals._sum?.totalCo2Saved ?? 0;
 
   return (
@@ -47,10 +46,10 @@ export default async function Dashboard() {
           color="from-blue-500 to-blue-600"
         />
         <StatCard
-          label="Total Points"
-          value={totalPoints}
-          icon={<Star className="w-8 h-8" />}
-          color="from-amber-500 to-amber-600"
+          label="Total Trips"
+          value={totalTrips}
+          icon={<Route className="w-8 h-8" />}
+          color="from-purple-500 to-purple-600"
         />
         <StatCard
           label="CO₂ Saved (kg)"
@@ -79,11 +78,15 @@ export default async function Dashboard() {
                   </div>
                   <div>
                     <p className="font-semibold text-slate-900">{user.displayName}</p>
-                    <p className="text-sm text-slate-500">{user.totalCo2Saved.toFixed(1)} kg CO₂ saved</p>
+                    <p className="text-sm text-slate-500">
+                      {(user.totalCo2Saved / 1000).toFixed(2)} kg CO₂ saved
+                    </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-lg text-amber-600">{user.totalPoints} pts</p>
+                  <p className="font-bold text-lg text-green-600">
+                    {(user.totalCo2Saved / 1000).toFixed(2)} kg
+                  </p>
                 </div>
               </div>
             ))}
@@ -94,21 +97,21 @@ export default async function Dashboard() {
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <h2 className="text-xl font-bold text-slate-900 mb-6">Quick Stats</h2>
           <div className="space-y-4">
-            <div className="p-4 bg-blue-50 rounded-xl border-l-4 border-blue-500">
-              <p className="text-sm text-slate-600">Avg Points/User</p>
-              <p className="text-2xl font-bold text-blue-600">
-                {totalUsers > 0 ? (totalPoints / totalUsers).toFixed(0) : 0}
-              </p>
-            </div>
             <div className="p-4 bg-green-50 rounded-xl border-l-4 border-green-500">
               <p className="text-sm text-slate-600">Avg CO₂/User (kg)</p>
               <p className="text-2xl font-bold text-green-600">
                 {totalUsers > 0 ? (totalCo2Saved / totalUsers / 1000).toFixed(2) : 0}
               </p>
             </div>
+            <div className="p-4 bg-blue-50 rounded-xl border-l-4 border-blue-500">
+              <p className="text-sm text-slate-600">Avg Trips/User</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {totalUsers > 0 ? (totalTrips / totalUsers).toFixed(1) : 0}
+              </p>
+            </div>
             <div className="p-4 bg-purple-50 rounded-xl border-l-4 border-purple-500">
               <p className="text-sm text-slate-600">Total Trips</p>
-              <p className="text-2xl font-bold text-purple-600">{recentTrips.length}</p>
+              <p className="text-2xl font-bold text-purple-600">{totalTrips}</p>
             </div>
           </div>
         </div>
@@ -126,9 +129,9 @@ export default async function Dashboard() {
               <tr className="border-b border-slate-200">
                 <th className="text-left py-3 px-4 font-semibold text-slate-600">User</th>
                 <th className="text-left py-3 px-4 font-semibold text-slate-600">Mode</th>
+                <th className="text-left py-3 px-4 font-semibold text-slate-600">Destination</th>
                 <th className="text-left py-3 px-4 font-semibold text-slate-600">Distance</th>
                 <th className="text-left py-3 px-4 font-semibold text-slate-600">CO₂ Saved</th>
-                <th className="text-left py-3 px-4 font-semibold text-slate-600">Points</th>
                 <th className="text-left py-3 px-4 font-semibold text-slate-600">Date</th>
               </tr>
             </thead>
@@ -141,12 +144,16 @@ export default async function Dashboard() {
                       {trip.mode}
                     </span>
                   </td>
+                  <td className="py-3 px-4 text-slate-600 max-w-[160px] truncate">
+                    {trip.destLabel || "-"}
+                  </td>
                   <td className="py-3 px-4 text-slate-600">{trip.distanceKm.toFixed(1)} km</td>
-                  <td className="py-3 px-4 text-green-600 font-semibold">{(trip.co2Saved / 1000).toFixed(2)} kg</td>
-                  <td className="py-3 px-4 text-amber-600 font-semibold">+{trip.points}</td>
+                  <td className="py-3 px-4 text-green-600 font-semibold">
+                    {(trip.co2Saved / 1000).toFixed(2)} kg
+                  </td>
                   <td className="py-3 px-4 text-slate-500 text-sm flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    {new Date(trip.createdAt).toLocaleDateString()}
+                    {new Date(trip.createdAt).toLocaleDateString("th-TH")}
                   </td>
                 </tr>
               ))}
