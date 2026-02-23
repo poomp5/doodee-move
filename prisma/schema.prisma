@@ -4,6 +4,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
 }
 
 model User {
@@ -15,7 +16,6 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   trips         Trip[]
-  session       UserSession?
 }
 
 model Trip {
@@ -35,8 +35,14 @@ model Trip {
 }
 
 model UserSession {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  lineUserId    String   @unique
+  updatedAt     DateTime @updatedAt
+  step          String   @default("IDLE")
+  originLat     Float?
+  originLng     Float?
+  destLat       Float?
+  destLng       Float?
+  destLabel     String?
+  pendingRoutes Json?
 }
