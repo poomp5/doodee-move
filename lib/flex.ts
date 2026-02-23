@@ -200,15 +200,9 @@ function buildRouteBubble(route: RouteResult, index: number): FlexBubble {
       layout: "vertical",
       spacing: "sm",
       contents: [
-        route.steps.length > 0
-          ? {
-              type: "text",
-              text: `เส้นทาง: ${route.steps.slice(0, 2).join(" → ")}${route.steps.length > 2 ? " (...)" : ""}`,
-              size: "xs",
-              color: "#888888",
-              wrap: true,
-            }
-          : { type: "text", text: "", size: "xs", color: "transparent" },
+        // the short preview of steps is deliberately removed; users will see
+        // the full instructions after selecting a route
+        { type: "text", text: "", size: "xs", color: "transparent" },
         {
           type: "button",
           action: {
@@ -225,6 +219,7 @@ function buildRouteBubble(route: RouteResult, index: number): FlexBubble {
   };
 }
 
+// builds a carousel of route bubbles used for initial choice
 export function buildRoutesFlexMessage(
   routes: RouteResult[],
   destLabel: string
@@ -238,5 +233,89 @@ export function buildRoutesFlexMessage(
       type: "carousel",
       contents: bubbles,
     } as FlexCarousel,
+  };
+}
+
+// builds a single-bubble flex message showing the full step-by-step
+// instructions for a route; includes CO₂ saved, distance/time, and an
+// optional static map image generated from the polyline if available.
+export function buildRouteDetailFlex(
+  route: RouteResult,
+  destLabel: string
+): FlexMessage {
+  const co2SavedKg = (calcCo2Saved(route.distanceKm, route.mode) / 1000).toFixed(2);
+  const primaryColor = "#2a9c64";
+
+  // attempt to include a static map image when we have a polyline
+  let heroImage: any = undefined;
+  if (route.polyline) {
+    const key = process.env.GOOGLE_MAPS_API_KEY;
+    if (key) {
+      const encoded = encodeURIComponent(route.polyline);
+      const url = `https://maps.googleapis.com/maps/api/staticmap?size=600x400&path=enc:${encoded}&key=${key}`;
+      heroImage = {
+        type: "image",
+        url,
+        size: "full",
+        aspectRatio: "16:9",
+        aspectMode: "cover",
+      };
+    }
+  }
+
+  const stepTexts = route.steps.map((s) => ({ type: "text", text: s, size: "sm", wrap: true }));
+
+  const bodyContents: any[] = [
+    {
+      type: "text",
+      text: `เส้นทางไป${destLabel} (${route.mode})`,
+      weight: "bold",
+      size: "md",
+      wrap: true,
+    },
+    {
+      type: "box",
+      layout: "baseline",
+      spacing: "xs",
+      contents: [
+        { type: "text", text: "ระยะทาง:", size: "xs", color: "#999" },
+        { type: "text", text: `${route.distanceKm.toFixed(1)} km`, size: "xs", weight: "bold", color: "#333" },
+        { type: "text", text: "เวลา:", size: "xs", color: "#999", margin: "md" },
+        { type: "text", text: `~${route.durationMin} นาที`, size: "xs", weight: "bold", color: "#333" },
+      ],
+    },
+    {
+      type: "box",
+      layout: "baseline",
+      spacing: "xs",
+      contents: [
+        { type: "text", text: "CO₂ ประหยัด:", size: "xs", color: "#999" },
+        { type: "text", text: `${co2SavedKg} kg`, size: "xs", weight: "bold", color: primaryColor },
+      ],
+    },
+    { type: "separator", margin: "md", color: "#e9e9e9" },
+    ...stepTexts,
+  ];
+
+  const bubble: any = {
+    type: "bubble",
+    size: "kilo",
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: bodyContents,
+      paddingAll: "12px",
+    },
+  };
+
+  if (heroImage) {
+    bubble.hero = heroImage;
+  }
+
+  return {
+    type: "flex",
+    altText: `รายละเอียดเส้นทางไป${destLabel}`,
+    contents: bubble,
   };
 }

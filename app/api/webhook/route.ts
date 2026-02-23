@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.0.8";
+const BOT_VERSION = "1.0.9";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -13,7 +13,7 @@ import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
 import { getRoutes } from "@/lib/maps";
 import { calcCo2Saved, calcPoints } from "@/lib/carbon";
-import { buildRoutesFlexMessage } from "@/lib/flex";
+import { buildRoutesFlexMessage, buildRouteDetailFlex } from "@/lib/flex";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -161,7 +161,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\nส่งตำแหน่งปัจจุบันของคุณมาเพื่อเริ่มค้นหาเส้นทางสีเขียว \n(Bot v${BOT_VERSION})`,
+      text: "สวัสดีครับ! 🌿 Doodee Move\n\nส่งตำแหน่งปัจจุบันของคุณมาเพื่อเริ่มค้นหาเส้นทางสีเขียว",
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -220,13 +220,10 @@ async function handlePostback(event: WebhookEvent) {
 
     await clearSession(lineUserId);
 
-    await safeReply(event.replyToken, [
-      {
-        type: "text",
-        text: `✅ เลือกเส้นทาง ${chosen.mode} สำเร็จ!\n${co2Saved > 0 ? `ประหยัด CO₂ ${(co2Saved / 1000).toFixed(2)} kg` : ""}
-(Bot v${BOT_VERSION})`,
-      },
-    ]);
+    // reply with the detailed flex card including full step-by-step
+    // instructions (map image added if available).
+    const detailFlex = buildRouteDetailFlex(chosen, session.destLabel ?? "");
+    await safeReply(event.replyToken, [detailFlex]);
   }
 }
 
