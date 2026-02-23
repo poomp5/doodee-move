@@ -75,6 +75,25 @@ async function handleEvent(event: WebhookEvent) {
       user = await prisma.user.create({ data: { lineUserId, displayName } });
     }
 
+    // --- Check for score command anytime ---
+    if (msg.type === "text") {
+      const text = (msg.text ?? "").trim().toLowerCase();
+      if (text === "แต้ม" || text === "point" || text === "คะแนน") {
+        const co2Kg = (user.totalCo2Saved / 1000).toFixed(2);
+        await safeReply(replyToken, [{
+          type: "text",
+          text: `⭐ แต้มรักษ์โลกของคุณ
+
+${user.displayName}
+แต้มสะสม: ${user.totalPoints} แต้ม
+CO₂ ประหยัดรวม: ${co2Kg} kg
+
+🌍 ขอบคุณที่ช่วยรักษ์โลก!`,
+        }]);
+        return;
+      }
+    }
+
     const session = await getSession(lineUserId);
 
     // --- รับ Location (origin) ---
