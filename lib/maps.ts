@@ -58,9 +58,15 @@ export async function getRoutes(
       const leg = route.legs[0];
       const distanceKm = leg.distance.value / 1000;
       const durationMin = Math.ceil(leg.duration.value / 60);
-      const steps = leg.steps
+      let steps = leg.steps
         .filter((s) => s.html_instructions)
-        .map((s) => s.html_instructions.replace(/<[^>]*>/g, ""));
+        .map((s) =>
+          s.html_instructions
+            .replace(/<[^>]*>/g, "")
+            // strip Google "plus codes" which are useless in directions
+            .replace(/\b[A-Z0-9]{4}\+[A-Z0-9]{2,3}\b/g, "")
+            .trim()
+        );
       const polyline = route.overview_polyline?.points;
 
       // ป้องกัน duplicate mode
@@ -72,15 +78,27 @@ export async function getRoutes(
     }
   }
 
-  // Walking route
+  // Walking/equipment routes
   try {
     const res = await mapsClient.directions({
       params: { origin, destination, mode: TravelMode.walking, language: Language.th, key },
     });
-    const route = res.data.routes[0];
-    if (route) {
-      const leg = route.legs[0];
+    const walkRoute = res.data.routes[0];
+    if (walkRoute) {
+      const leg = walkRoute.legs[0];
       const distanceKm = leg.distance.value / 1000;
+      // always offer walking as an option
+      results.push({
+        mode: "WALK",
+        label: "เดิน",
+        distanceKm,
+        durationMin: Math.ceil(leg.duration.value / 60),
+        steps: leg.steps
+          .filter((s) => s.html_instructions)
+          .map((s) => s.html_instructions.replace(/<[^>]*>/g, "").replace(/\b[A-Z0-9]{4}\+[A-Z0-9]{2,3}\b/g, "").trim()),
+        polyline: walkRoute.overview_polyline?.points,
+      });
+
       // เสนอจักรยาน/e-scooter ถ้าระยะ <= 10km
       if (distanceKm <= 10) {
         results.push({
@@ -96,6 +114,40 @@ export async function getRoutes(
           distanceKm,
           durationMin: Math.ceil((distanceKm / 15) * 60),
           steps: ["ขี่จักรยานตรงไปยังปลายทาง"],
+        });
+      }
+    }
+  } catch {
+    // ignore
+  }
+
+  // Driving / taxi route – good fallback when transit isn’t practical
+  try {
+    const res = await mapsClient.directions({
+      params: { origin, destination, mode: TravelMode.driving, language: Language.th, key },
+    });
+    const driveRoute = res.data.routes[0];
+    if (driveRoute) {
+      const leg = driveRoute.legs[0];
+      const distanceKm = leg.distance.value / 1000;
+      const durationMin = Math.ceil(leg.duration.value / 60);
+      const steps = leg.steps
+        .filter((s) => s.html_instructions)
+        .map((s) =>
+          s.html_instructions
+            .replace(/<[^>]*>/g, "")
+            .replace(/\b[A-Z0-9]{4}\+[A-Z0-9]{2,3}\b/g, "")
+            .trim()
+        );
+      // only add driving if it isn’t already represented by a transit mode
+      if (!results.find((r) => r.mode === "CAR")) {
+        results.push({
+          mode: "CAR",
+          label: "รถยนต์/แท็กซี่",
+          distanceKm,
+          durationMin,
+          steps,
+          polyline: driveRoute.overview_polyline?.points,
         });
       }
     }

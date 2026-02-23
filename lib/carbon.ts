@@ -16,6 +16,7 @@ export const MODE_LABEL: Record<string, string> = {
   ESCOOTER: "E-Scooter (Anywheel/GoGo)",
   BICYCLE: "จักรยาน",
   WALK: "เดิน",
+  CAR: "รถยนต์/แท็กซี่",
 };
 
 export const MODE_EMOJI: Record<string, string> = {
@@ -25,6 +26,7 @@ export const MODE_EMOJI: Record<string, string> = {
   ESCOOTER: "🛴",
   BICYCLE: "🚲",
   WALK: "🚶",
+  CAR: "🚗",
 };
 
 /**
