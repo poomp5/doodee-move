@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.1.10";
+const BOT_VERSION = "1.1.11";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -197,7 +197,12 @@ async function handlePostback(event: WebhookEvent) {
   if (data.startsWith("route=")) {
     const idx = parseInt(data.slice("route=".length), 10);
     const session = await getSession(lineUserId);
-    if (!session || !session.pendingRoutes) return;
+    // reject postbacks unless we're actively awaiting a route; this also
+    // guards against a stale carousel clicking after the session has been
+    // cleared (old tokens/images) which was causing missing coordinates.
+    if (!session || session.step !== "AWAITING_ROUTE" || !session.pendingRoutes) {
+      return;
+    }
     const routes: any[] = session.pendingRoutes as any[];
     const chosen = routes[idx];
     if (!chosen) return;

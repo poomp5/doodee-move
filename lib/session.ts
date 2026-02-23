@@ -39,6 +39,9 @@ export async function setSession(data: SessionData) {
 
 export async function clearSession(lineUserId: string) {
   const prisma = getPrisma();
+  // we explicitly null out every field; using `undefined` in a Prisma update
+  // object means “leave it alone”, which previously allowed pendingRoutes to
+  // stick around and confuse later postback handling.
   return prisma.userSession.upsert({
     where: { lineUserId },
     update: {
@@ -48,7 +51,9 @@ export async function clearSession(lineUserId: string) {
       destLat: null,
       destLng: null,
       destLabel: null,
-      pendingRoutes: undefined,
+      // prisma's generated types for Json fields are annoyingly strict,
+      // so cast to any when we want to clear it. this writes a SQL NULL.
+      pendingRoutes: null as any,
     },
     create: { lineUserId, step: "IDLE" },
   });
