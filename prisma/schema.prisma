@@ -1,50 +1,42 @@
-generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
-}
-
 datasource db {
   provider = "postgresql"
 }
 
+generator client {
+  provider = "prisma-client-js"
+}
+
 model User {
-  id           String   @id @default(cuid())
-  lineUserId   String   @unique
-  displayName  String
-  totalPoints  Int      @default(0)
-  totalCo2Saved Float   @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  trips        Trip[]
-  session      UserSession?
+  id            String   @id @default(cuid())
+  lineUserId    String   @unique
+  displayName   String
+  totalPoints   Int      @default(0)
+  totalCo2Saved Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  trips         Trip[]
+  session       UserSession?
 }
 
 model Trip {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  originLat   Float
-  originLng   Float
-  destLat     Float
-  destLng     Float
-  destLabel   String?
-  mode        String   // BTS, MRT, BUS, ESCOOTER, BICYCLE, WALK
-  distanceKm  Float
-  co2Saved    Float
-  points      Int
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originLat Float
+  originLng Float
+  destLat   Float
+  destLng   Float
+  destLabel String?
+  mode      String
+  distanceKm Float
+  co2Saved  Float
+  points    Int
+  createdAt DateTime @default(now())
 }
 
 model UserSession {
-  id            String   @id @default(cuid())
-  lineUserId    String   @unique
-  user          User     @relation(fields: [lineUserId], references: [lineUserId])
-  step          String   // IDLE, WAITING_DESTINATION, AWAITING_ROUTE
-  originLat     Float?
-  originLng     Float?
-  destLat       Float?
-  destLng       Float?
-  destLabel     String?
-  pendingRoutes Json?    // stores serialized route options while waiting for selection
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 }
