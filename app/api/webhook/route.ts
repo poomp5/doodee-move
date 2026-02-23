@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.0.9";
+const BOT_VERSION = "1.1.9";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -90,12 +90,16 @@ async function handleEvent(event: WebhookEvent) {
         originLat: msg.latitude!,
         originLng: msg.longitude!,
       });
-      await safeReply(replyToken, [
-        {
-          type: "text",
-          text: `📍 รับตำแหน่งของคุณแล้ว!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางเลยครับ (Bot v${BOT_VERSION})`,
-        },
-      ]);
+      await safeReply(
+        replyToken,
+        [
+          {
+            type: "text",
+            text: `📍 รับตำแหน่งของคุณแล้ว!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางเลยครับ (Bot v${BOT_VERSION})`,
+          },
+        ],
+        "ไม่สามารถส่งข้อความตอบกลับได้ กรุณาลองส่งตำแหน่งอีกครั้ง"
+      );
       return;
     }
 
@@ -114,9 +118,20 @@ async function handleEvent(event: WebhookEvent) {
       } else if (msg.type === "text") {
         const text = (msg.text ?? "").trim();
         destLabel = text;
-        const geocoded = await geocodePlace(text);
+        let geocoded;
+        try {
+          geocoded = await geocodePlace(text);
+        } catch (err) {
+          console.error("[webhook] geocodePlace failed", err);
+          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานที่ กรุณาลองใหม่อีกครั้ง" }]);
+          return;
+        }
         if (!geocoded) {
-          await safeReply(replyToken, [{ type: "text", text: `ไม่พบสถานที่ "${text}" ลองพิมพ์ใหม่หรือส่ง location ปลายทางแทนครับ` }]);
+          await safeReply(
+            replyToken,
+            [{ type: "text", text: `ไม่พบสถานที่ "${text}" ลองพิมพ์ใหม่หรือส่ง location ปลายทางแทนครับ` }],
+            "ไม่สามารถส่งข้อความตอบกลับได้ กรุณาลองพิมพ์ปลายทางใหม่"
+          );
           return;
         }
         destLat = geocoded.lat;
@@ -161,7 +176,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\nส่งตำแหน่งปัจจุบันของคุณมาเพื่อเริ่มค้นหาเส้นทางสีเขียว (Bot v${BOT_VERSION})`,
+      text: `สวัสดีครับ! 🌿 Doodee Move\n\nส่งตำแหน่งปัจจุบันของคุณมาเพื่อเริ่มค้นหาเส้นทางสีเขียว \n\n(Bot v${BOT_VERSION})`,
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
