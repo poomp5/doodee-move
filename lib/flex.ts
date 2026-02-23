@@ -113,7 +113,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               contents: [
                 {
                   type: "image",
-                  url: "https://cdn-icons-png.flaticon.com/512/2910/2910795.png",
+                  url: "https://i.ibb.co/sdbnqqvk/clock.png",
                   size: "sm",
                   aspectRatio: "1:1",
                   flex: 0,
@@ -162,7 +162,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               contents: [
                 {
                   type: "image",
-                  url: "https://cdn-icons-png.flaticon.com/512/2995/2995478.png",
+                  url: "https://i.ibb.co/KpXgcJFf/carbon-cloud-arrow-down.png",
                   size: "sm",
                   aspectRatio: "1:1",
                   flex: 0,
@@ -210,7 +210,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               contents: [
                 {
                   type: "image",
-                  url: "https://cdn-icons-png.flaticon.com/512/2107/2107844.png",
+                  url: "https://i.ibb.co/C5Y0mrWv/star.png",
                   size: "sm",
                   aspectRatio: "1:1",
                   flex: 0,
