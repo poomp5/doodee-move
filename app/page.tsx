@@ -6,7 +6,6 @@ export default function Home() {
       <div className="absolute w-[500px] h-[500px] bg-white/5 rounded-full blur-3xl animate-pulse"></div>
 
       <div className="relative text-center text-white px-6">
-        {/* Floating Logo */}
         <div className="mb-8 flex justify-center">
           <Image src={'/logo.png'} width={200} height={200} alt="logo"  className="hover:transition-all duration-200 hover:-translate-y-1.5"/>
         </div>
