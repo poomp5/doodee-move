@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.1.9";
+const BOT_VERSION = "1.1.10";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -212,20 +212,41 @@ async function handlePostback(event: WebhookEvent) {
       user = await prisma.user.create({ data: { lineUserId, displayName: "ผู้ใช้" } });
     }
 
-    await prisma.trip.create({
-      data: {
-        userId: user.id,
-        originLat: session.originLat!,
-        originLng: session.originLng!,
-        destLat: session.destLat!,
-        destLng: session.destLng!,
-        destLabel: session.destLabel ?? "",
-        mode: chosen.mode,
-        distanceKm: chosen.distanceKm,
-        co2Saved,
-        points: 0,
-      },
-    });
+    // make sure session still has the coordinates we need; if they are
+    // missing something went wrong (e.g. the session got cleared in between)
+    if (
+      session.originLat == null ||
+      session.originLng == null ||
+      session.destLat == null ||
+      session.destLng == null
+    ) {
+      console.warn("[webhook] missing coordinates in session", session);
+      // bail out gracefully instead of trying to insert nulls
+      await safeReply(event.replyToken, [
+        { type: "text", text: "เกิดข้อผิดพลาด ภายในระบบ วันเวลาหรือตำแหน่งหายไป กรุณาเริ่มต้นใหม่" },
+      ]);
+    } else {
+      await prisma.trip.create({
+        data: {
+          // connect the relation explicitly instead of relying on userId alone
+          user: { connect: { id: user.id } },
+          originLat: session.originLat,
+          originLng: session.originLng,
+          destLat: session.destLat,
+          destLng: session.destLng,
+          destLabel: session.destLabel ?? "",
+          mode: chosen.mode,
+          distanceKm: chosen.distanceKm,
+          co2Saved,
+          points: 0,
+        },
+      });
+    }
+
+    // regardless of whether the create succeeded we clear session so the
+    // user can start a new search; if the create failed they will get an
+    // error message above but not be stuck in the old state
+    await clearSession(lineUserId);
     await prisma.user.update({
       where: { id: user.id },
       data: {
