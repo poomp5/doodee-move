@@ -5,15 +5,15 @@ type FlexMessage = any;
 type FlexBubble = any;
 type FlexCarousel = any;
 import { RouteResult } from "./maps";
-import { calcCo2Saved, calcPoints, MODE_LABEL, MODE_EMOJI } from "./carbon";
+import { calcCo2Saved, calcPoints, MODE_LABEL } from "./carbon";
 
 function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: number): FlexBubble {
   const co2Saved = calcCo2Saved(route.distanceKm, route.mode);
   const points = calcPoints(co2Saved);
-  const emoji = MODE_EMOJI[route.mode] ?? "🚗";
   const label = MODE_LABEL[route.mode] ?? route.mode;
   const co2SavedKg = (co2Saved / 1000).toFixed(2);
-  const bgColor = co2Saved > 500 ? "#1b5e20" : co2Saved > 100 ? "#2e7d32" : "#558b2f";
+  const primaryColor = "#2a9c64";
+  const accentColor = "#f57f17";
 
   return {
     type: "bubble",
@@ -24,13 +24,13 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
       contents: [
         {
           type: "text",
-          text: `${emoji} ${label}`,
+          text: label,
           weight: "bold",
           size: "lg",
           color: "#ffffff",
         },
       ],
-      backgroundColor: bgColor,
+      backgroundColor: primaryColor,
       paddingAll: "12px",
     },
     body: {
@@ -42,7 +42,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
           type: "box",
           layout: "horizontal",
           contents: [
-            { type: "text", text: "📄 ระยะทาง", size: "sm", color: "#666666", flex: 2 },
+            { type: "text", text: "ระยะทาง", size: "sm", color: "#666666", flex: 2 },
             {
               type: "text",
               text: `${route.distanceKm.toFixed(1)} km`,
@@ -57,7 +57,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
           type: "box",
           layout: "horizontal",
           contents: [
-            { type: "text", text: "⏱️ เวลา", size: "sm", color: "#666666", flex: 2 },
+            { type: "text", text: "เวลา", size: "sm", color: "#666666", flex: 2 },
             {
               type: "text",
               text: `~${route.durationMin} นาที`,
@@ -73,13 +73,13 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
           type: "box",
           layout: "horizontal",
           contents: [
-            { type: "text", text: "🌿 CO₂ ประหยัด", size: "sm", color: bgColor, weight: "bold", flex: 2 },
+            { type: "text", text: "CO₂ ประหยัด", size: "sm", color: primaryColor, weight: "bold", flex: 2 },
             {
               type: "text",
               text: `${co2SavedKg} kg`,
               size: "sm",
               weight: "bold",
-              color: bgColor,
+              color: primaryColor,
               align: "end",
               flex: 1,
             },
@@ -89,13 +89,13 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
           type: "box",
           layout: "horizontal",
           contents: [
-            { type: "text", text: "⭐ แต้มได้", size: "sm", color: "#f57f17", weight: "bold", flex: 2 },
+            { type: "text", text: "แต้มได้", size: "sm", color: accentColor, weight: "bold", flex: 2 },
             {
               type: "text",
               text: `+${points} แต้ม`,
               size: "sm",
               weight: "bold",
-              color: "#f57f17",
+              color: accentColor,
               align: "end",
               flex: 1,
             },
@@ -112,7 +112,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
         route.steps.length > 0
           ? {
               type: "text",
-              text: `เส้นทาง: ${route.steps.slice(0, 2).join(" → ")}${route.steps.length > 2 ? " (...) " : ""}`,
+              text: `เส้นทาง: ${route.steps.slice(0, 2).join(" → ")}${route.steps.length > 2 ? " (...)" : ""}`,
               size: "xs",
               color: "#888888",
               wrap: true,
@@ -125,7 +125,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
           contents: [
             {
               type: "text",
-              text: `ฐาน: ${userTotalPoints + points} ⭐`,
+              text: `รวมแต้ม: ${userTotalPoints + points}`,
               size: "xs",
               color: "#777777",
               flex: 1,
@@ -140,7 +140,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
             data: `route=${index}`,
           },
           style: "primary",
-          color: bgColor,
+          color: primaryColor,
         },
       ],
       paddingAll: "10px",
