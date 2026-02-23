@@ -25,7 +25,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
       contents: [
         {
           type: "image",
-          url: "https://ibb.co/JRRTbm7j",
+          url: "https://i.ibb.co/PZZybFhG/logo-2.png",
           size: "sm",
           aspectRatio: "1:1",
           flex: 0,
@@ -64,9 +64,11 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               cornerRadius: "6px",
               contents: [
                 {
-                  type: "icon",
+                  type: "image",
                   url: "https://cdn-icons-png.flaticon.com/512/3597/3597531.png",
                   size: "sm",
+                  aspectRatio: "1:1",
+                  flex: 0,
                 },
               ],
               justifyContent: "center",
@@ -110,9 +112,11 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               cornerRadius: "6px",
               contents: [
                 {
-                  type: "icon",
+                  type: "image",
                   url: "https://cdn-icons-png.flaticon.com/512/2910/2910795.png",
                   size: "sm",
+                  aspectRatio: "1:1",
+                  flex: 0,
                 },
               ],
               justifyContent: "center",
@@ -157,9 +161,11 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               cornerRadius: "6px",
               contents: [
                 {
-                  type: "icon",
+                  type: "image",
                   url: "https://cdn-icons-png.flaticon.com/512/2995/2995478.png",
                   size: "sm",
+                  aspectRatio: "1:1",
+                  flex: 0,
                 },
               ],
               justifyContent: "center",
@@ -203,9 +209,11 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               cornerRadius: "6px",
               contents: [
                 {
-                  type: "icon",
+                  type: "image",
                   url: "https://cdn-icons-png.flaticon.com/512/2107/2107844.png",
                   size: "sm",
+                  aspectRatio: "1:1",
+                  flex: 0,
                 },
               ],
               justifyContent: "center",
