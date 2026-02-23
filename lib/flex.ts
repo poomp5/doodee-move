@@ -200,9 +200,6 @@ function buildRouteBubble(route: RouteResult, index: number): FlexBubble {
       layout: "vertical",
       spacing: "sm",
       contents: [
-        // the short preview of steps is deliberately removed; users will see
-        // the full instructions after selecting a route
-        { type: "text", text: "", size: "xs", color: "transparent" },
         {
           type: "button",
           action: {
