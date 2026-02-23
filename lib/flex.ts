@@ -65,7 +65,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               contents: [
                 {
                   type: "image",
-                  url: "https://i.ibb.co/SkMDw7s/world.png",
+                  url: "https://img5.pic.in.th/file/secure-sv1/4134f662b759323040.png",
                   size: "sm",
                   aspectRatio: "1:1",
                   flex: 0,
@@ -113,7 +113,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               contents: [
                 {
                   type: "image",
-                  url: "https://i.ibb.co/sdbnqqvk/clock.png",
+                  url: "https://img2.pic.in.th/42176840fe9c34f340.png",
                   size: "sm",
                   aspectRatio: "1:1",
                   flex: 0,
@@ -162,7 +162,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               contents: [
                 {
                   type: "image",
-                  url: "https://i.ibb.co/KpXgcJFf/carbon-cloud-arrow-down.png",
+                  url: "https://img2.pic.in.th/43071144b09bbab817.png",
                   size: "sm",
                   aspectRatio: "1:1",
                   flex: 0,
@@ -210,7 +210,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
               contents: [
                 {
                   type: "image",
-                  url: "https://i.ibb.co/C5Y0mrWv/star.png",
+                  url: "https://img2.pic.in.th/starred.png",
                   size: "sm",
                   aspectRatio: "1:1",
                   flex: 0,
