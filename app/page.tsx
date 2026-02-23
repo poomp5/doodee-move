@@ -3,7 +3,6 @@ import Image from "next/image";
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#2E9C63] flex items-center justify-center relative overflow-hidden">
-      {/* Soft floating background circle */}
       <div className="absolute w-[500px] h-[500px] bg-white/5 rounded-full blur-3xl animate-pulse"></div>
 
       <div className="relative text-center text-white px-6">
