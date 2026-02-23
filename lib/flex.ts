@@ -25,7 +25,7 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
       contents: [
         {
           type: "image",
-          url: "https://ibb.co/JRRTbm7j",
+          url: "https://i.ibb.co/PZZybFhG/logo-2.png",
           size: "sm",
           aspectRatio: "1:1",
           flex: 0,
