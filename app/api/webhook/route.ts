@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
+const BOT_VERSION = "1.0.1";
+
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
 // can fall back to a loose `any` alias which keeps the rest of our code typed
@@ -77,18 +79,14 @@ async function handleEvent(event: WebhookEvent) {
 
     // --- Check for score command anytime ---
     if (msg.type === "text") {
-      const text = (msg.text ?? "").trim().toLowerCase();
-      if (text === "แต้ม" || text === "point" || text === "คะแนน") {
+      const rawText = msg.text ?? "";
+      const text = rawText.trim();
+      // Check for score command - exact match without toLowerCase for Thai chars
+      if (text === "แต้ม" || text.toLowerCase() === "point" || text === "คะแนน") {
         const co2Kg = (user.totalCo2Saved / 1000).toFixed(2);
         await safeReply(replyToken, [{
           type: "text",
-          text: `⭐ แต้มรักษ์โลกของคุณ
-
-${user.displayName}
-แต้มสะสม: ${user.totalPoints} แต้ม
-CO₂ ประหยัดรวม: ${co2Kg} kg
-
-🌍 ขอบคุณที่ช่วยรักษ์โลก!`,
+          text: `⭐ แต้มรักษ์โลกของคุณ\n\n${user.displayName}\nแต้มสะสม: ${user.totalPoints} แต้ม\nความจาม CO2: ${co2Kg} kg\n\nBot v${BOT_VERSION}`,
         }]);
         return;
       }
@@ -107,7 +105,7 @@ CO₂ ประหยัดรวม: ${co2Kg} kg
       await safeReply(replyToken, [
         {
           type: "text",
-          text: "📍 รับตำแหน่งของคุณแล้ว!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางเลยครับ",
+          text: `📍 รับตำแหน่งของคุณแล้ว!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางเลยครับ (Bot v${BOT_VERSION})`,
         },
       ]);
       return;
@@ -247,13 +245,10 @@ async function handlePostback(event: WebhookEvent) {
 
     await clearSession(lineUserId);
 
-    // reply with confirmation and updated score
     await safeReply(event.replyToken, [
       {
         type: "text",
-        text: `คุณเลือกเส้นทาง ${chosen.mode} (${chosen.distanceKm.toFixed(1)} km)
-คุณได้รับ ${points} แต้ม
-ยอดรวมปัจจุบัน: ${updatedUser?.totalPoints} แต้ม`,
+        text: `✅ เลือกเส้นทาง ${chosen.mode} สำเร็จ!\nคุณได้รับ +${points} แต้ม\nยอดรวม: ${updatedUser?.totalPoints} ⭐\n(Bot v${BOT_VERSION})`,
       },
     ]);
   }
