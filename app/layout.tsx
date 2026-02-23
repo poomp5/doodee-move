@@ -13,23 +13,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://doodeemove.com"), // เปลี่ยนเป็น domain จริง
+  metadataBase: new URL("https://move.doodee-future.com"),
 
   title: {
-    default: "Doodee Move | Smart & Sustainable Mobility Platform",
+    default: "Doodee Move | เดินทางอัจฉริยะ ลดคาร์บอน",
     template: "%s | Doodee Move",
   },
 
   description:
-    "Doodee Move helps you choose the fastest, cheapest, and most eco-friendly routes while tracking your carbon footprint in real time.",
+    "Doodee Move แพลตฟอร์มเดินทางอัจฉริยะที่ช่วยเลือกเส้นทางที่เร็วที่สุด ถูกที่สุด และเป็นมิตรกับสิ่งแวดล้อม พร้อมติดตาม Carbon Footprint แบบ Real-time",
 
   keywords: [
+    "Doodee Move",
     "Smart Mobility",
-    "Carbon Footprint Tracker",
+    "Carbon Footprint",
     "Sustainable Transport",
     "Eco Travel",
     "Thailand Smart City",
     "Green Transportation",
+    "ขนส่งสาธารณะ",
+    "ลดคาร์บอน",
   ],
 
   authors: [{ name: "Doodee Future Team" }],
@@ -37,29 +40,29 @@ export const metadata: Metadata = {
   publisher: "Doodee Future",
 
   openGraph: {
-    title: "Doodee Move | Smart Sustainable Travel",
+    title: "Doodee Move | เดินทางอัจฉริยะ ลดคาร์บอน",
     description:
-      "Track your eco-friendly commutes, reduce CO₂ emissions, and contribute to smarter cities.",
-    url: "https://doodeemove.com",
+      "เลือกเส้นทางที่ดีที่สุด ลด CO₂ และร่วมสร้างเมืองที่ยั่งยืน",
+    url: "https://move.doodee-future.com",
     siteName: "Doodee Move",
     images: [
       {
-        url: "/og-image.png", // ใส่ไฟล์ใน public/
+        url: "/logo.png",
         width: 1200,
         height: 630,
-        alt: "Doodee Move Smart Mobility Platform",
+        alt: "Doodee Move - Smart Sustainable Mobility Platform",
       },
     ],
-    locale: "en_US",
+    locale: "th_TH",
     type: "website",
   },
 
   twitter: {
     card: "summary_large_image",
-    title: "Doodee Move | Sustainable Mobility",
+    title: "Doodee Move | เดินทางอัจฉริยะ ลดคาร์บอน",
     description:
-      "Choose smarter routes. Reduce CO₂. Build better cities.",
-    images: ["/og-image.png"],
+      "เลือกเส้นทางที่ดีที่สุด ลด CO₂ และร่วมสร้างเมืองที่ยั่งยืน",
+    images: ["/logo.png"],
   },
 
   icons: {
