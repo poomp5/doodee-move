@@ -7,13 +7,11 @@ type FlexCarousel = any;
 import { RouteResult } from "./maps";
 import { calcCo2Saved, calcPoints, MODE_LABEL } from "./carbon";
 
-function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: number): FlexBubble {
+function buildRouteBubble(route: RouteResult, index: number): FlexBubble {
   const co2Saved = calcCo2Saved(route.distanceKm, route.mode);
-  const points = calcPoints(co2Saved);
   const label = MODE_LABEL[route.mode] ?? route.mode;
   const co2SavedKg = (co2Saved / 1000).toFixed(2);
   const primaryColor = "#2a9c64";
-  const accentColor = "#f57f17";
   const lightBg = "#f0f8f5";
 
   return {
@@ -194,54 +192,6 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
             },
           ],
         },
-        {
-          type: "box",
-          layout: "horizontal",
-          spacing: "md",
-          contents: [
-            {
-              type: "box",
-              layout: "vertical",
-              flex: 0,
-              width: "32px",
-              height: "32px",
-              backgroundColor: accentColor + "20",
-              cornerRadius: "6px",
-              contents: [
-                {
-                  type: "image",
-                  url: "https://img2.pic.in.th/starred.png",
-                  size: "sm",
-                  aspectRatio: "1:1",
-                  flex: 0,
-                },
-              ],
-              justifyContent: "center",
-              alignItems: "center",
-            },
-            {
-              type: "box",
-              layout: "vertical",
-              flex: 1,
-              contents: [
-                {
-                  type: "text",
-                  text: "แต้มได้",
-                  size: "xs",
-                  color: "#999999",
-                  margin: "none",
-                },
-                {
-                  type: "text",
-                  text: `+${points} แต้ม`,
-                  size: "sm",
-                  weight: "bold",
-                  color: accentColor,
-                },
-              ],
-            },
-          ],
-        },
       ],
       paddingAll: "12px",
     },
@@ -260,20 +210,6 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
             }
           : { type: "text", text: "", size: "xs", color: "transparent" },
         {
-          type: "box",
-          layout: "horizontal",
-          margin: "sm",
-          contents: [
-            {
-              type: "text",
-              text: `รวมแต้ม: ${userTotalPoints + points}`,
-              size: "xs",
-              color: "#777777",
-              flex: 1,
-            },
-          ],
-        },
-        {
           type: "button",
           action: {
             type: "postback",
@@ -291,10 +227,9 @@ function buildRouteBubble(route: RouteResult, userTotalPoints: number, index: nu
 
 export function buildRoutesFlexMessage(
   routes: RouteResult[],
-  userTotalPoints: number,
   destLabel: string
 ): FlexMessage {
-  const bubbles = routes.slice(0, 5).map((r, i) => buildRouteBubble(r, userTotalPoints, i));
+  const bubbles = routes.slice(0, 5).map((r, i) => buildRouteBubble(r, i));
 
   return {
     type: "flex",

@@ -78,19 +78,7 @@ async function handleEvent(event: WebhookEvent) {
     }
 
     // --- Check for score command anytime ---
-    if (msg.type === "text") {
-      const rawText = msg.text ?? "";
-      const text = rawText.trim();
-      // Check for score command - exact match without toLowerCase for Thai chars
-      if (text === "แต้ม" || text.toLowerCase() === "point" || text === "คะแนน") {
-        const co2Kg = (user.totalCo2Saved / 1000).toFixed(2);
-        await safeReply(replyToken, [{
-          type: "text",
-          text: `⭐ แต้มรักษ์โลกของคุณ\n\n${user.displayName}\nแต้มสะสม: ${user.totalPoints} แต้ม\nความจาม CO2: ${co2Kg} kg\n\nBot v${BOT_VERSION}`,
-        }]);
-        return;
-      }
-    }
+    // Removed: point system no longer supported
 
     const session = await getSession(lineUserId);
 
@@ -158,7 +146,7 @@ async function handleEvent(event: WebhookEvent) {
       });
 
       // send the flex carousel with actions; user will choose explicitly
-      const flexMsg = buildRoutesFlexMessage(routes, user.totalPoints, destLabel) as any;
+      const flexMsg = buildRoutesFlexMessage(routes, destLabel) as any;
       await safeReply(
         replyToken,
         [flexMsg],
@@ -168,22 +156,12 @@ async function handleEvent(event: WebhookEvent) {
     }
 
     // --- IDLE: รอรับ location ต้นทาง ---
-    if (msg.type === "text") {
-      const text = (msg.text ?? "").trim().toLowerCase();
-      if (text === "แต้ม" || text === "point" || text === "คะแนน") {
-        const co2Kg = (user.totalCo2Saved / 1000).toFixed(2);
-        await safeReply(replyToken, [{
-          type: "text",
-          text: `⭐ แต้มรักษ์โลกของคุณ\n\n${user.displayName}\nแต้มสะสม: ${user.totalPoints} แต้ม\nCO₂ ประหยัดรวม: ${co2Kg} kg\n\n🌍 ขอบคุณที่ช่วยรักษ์โลก!`,
-        }]);
-        return;
-      }
-    }
+    // Removed: point system commands no longer respond
 
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: "สวัสดีครับ! 🌿 Doodee Move\n\nส่งตำแหน่งปัจจุบันของคุณมาเพื่อเริ่มค้นหาเส้นทางสีเขียว\n\nพิมพ์ \"แต้ม\" เพื่อดูแต้มรักษ์โลกของคุณ",
+      text: "สวัสดีครับ! 🌿 Doodee Move\n\nส่งตำแหน่งปัจจุบันของคุณมาเพื่อเริ่มค้นหาเส้นทางสีเขียว",
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -210,7 +188,6 @@ async function handlePostback(event: WebhookEvent) {
     if (!chosen) return;
 
     const co2Saved = calcCo2Saved(chosen.distanceKm, chosen.mode);
-    const points = calcPoints(co2Saved);
 
     const prisma = getPrisma();
     // ensure user exists (should be, but just in case)
@@ -231,24 +208,23 @@ async function handlePostback(event: WebhookEvent) {
         mode: chosen.mode,
         distanceKm: chosen.distanceKm,
         co2Saved,
-        points,
+        points: 0,
       },
     });
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        totalPoints: { increment: points },
         totalCo2Saved: { increment: co2Saved },
       },
     });
-    const updatedUser = await prisma.user.findUnique({ where: { id: user.id } });
 
     await clearSession(lineUserId);
 
     await safeReply(event.replyToken, [
       {
         type: "text",
-        text: `✅ เลือกเส้นทาง ${chosen.mode} สำเร็จ!\nคุณได้รับ +${points} แต้ม\nยอดรวม: ${updatedUser?.totalPoints} ⭐\n(Bot v${BOT_VERSION})`,
+        text: `✅ เลือกเส้นทาง ${chosen.mode} สำเร็จ!\n${co2Saved > 0 ? `ประหยัด CO₂ ${(co2Saved / 1000).toFixed(2)} kg` : ""}
+(Bot v${BOT_VERSION})`,
       },
     ]);
   }
