@@ -12,7 +12,15 @@ export type RouteResult = {
   label: string;
   distanceKm: number;
   durationMin: number;
+  // individual step instructions (already stripped of HTML);
+  // we deliberately return the full list here because the UI will
+  // display a condensed preview first and then the complete details
+  // after the user makes a selection.
   steps: string[];
+  // overview polyline from Google, used when generating a static map
+  // image for the detail message. May be undefined if the API didn't
+  // provide one (e.g. for the simple ESCOOTER/BICYCLE routes).
+  polyline?: string;
 };
 
 const TRANSIT_MODES = [
@@ -52,12 +60,12 @@ export async function getRoutes(
       const durationMin = Math.ceil(leg.duration.value / 60);
       const steps = leg.steps
         .filter((s) => s.html_instructions)
-        .map((s) => s.html_instructions.replace(/<[^>]*>/g, ""))
-        .slice(0, 4);
+        .map((s) => s.html_instructions.replace(/<[^>]*>/g, ""));
+      const polyline = route.overview_polyline?.points;
 
       // ป้องกัน duplicate mode
       if (!results.find((r) => r.mode === modeKey)) {
-        results.push({ mode: modeKey, label: modeKey, distanceKm, durationMin, steps });
+        results.push({ mode: modeKey, label: modeKey, distanceKm, durationMin, steps, polyline });
       }
     } catch {
       // mode นี้ไม่มีเส้นทาง ข้ามไป
