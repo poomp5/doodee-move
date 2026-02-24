@@ -40,7 +40,7 @@ export async function getNearestBusStop(
     const res = await mapsClient.placesNearby({
       params: {
         location: { lat, lng },
-        radius: 1000, // 2km radius
+        radius: 2000, // 2km radius
         type: "bus_station",
         key,
         language: Language.th,
