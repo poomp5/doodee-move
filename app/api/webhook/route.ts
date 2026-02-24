@@ -11,7 +11,7 @@ const BOT_VERSION = "1.2.13";
 type WebhookEvent = any;
 import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
-import { getRoutes, getNearestBusStop } from "@/lib/maps";
+import { getRoutes, getNearestTrainStation } from "@/lib/maps";
 import { calcCo2Saved, calcPoints } from "@/lib/carbon";
 import { buildRoutesFlexMessage, buildRouteDetailFlex } from "@/lib/flex";
 
@@ -82,20 +82,20 @@ async function handleEvent(event: WebhookEvent) {
 
     const session = await getSession(lineUserId);
 
-    // --- Check for bus stop command ---
+    // --- Check for train station command ---
     if (msg.type === "text") {
       const text = (msg.text ?? "").trim();
-      if (text === "ป้ายรถเมย์ใกล้ฉัน" || text.includes("ป้ายรถเมล์")) {
+      if (text === "สถานีรถไฟใกล้ฉัน" || text.includes("สถานีรถไฟ")) {
         await setSession({
           lineUserId,
-          step: "FINDING_NEAREST_BUS_STOP",
+          step: "FINDING_NEAREST_TRAIN_STATION",
         });
         await safeReply(
           replyToken,
           [
             {
               type: "text",
-              text: "📍 ส่งตำแหน่งปัจจุบันของคุณมาเพื่อหาป้ายรถเมลล์ใกล้ที่สุดครับ",
+              text: "📍 ส่งตำแหน่งปัจจุบันของคุณมาเพื่อหาสถานีรถไฟใกล้ที่สุดครับ",
             },
           ],
           "ไม่สามารถส่งข้อความตอบกลับได้"
@@ -104,17 +104,17 @@ async function handleEvent(event: WebhookEvent) {
       }
     }
 
-    // --- รับ Location สำหรับการหาป้ายรถเมล์ที่ใกล้ที่สุด ---
-    if (session?.step === "FINDING_NEAREST_BUS_STOP") {
+    // --- รับ Location สำหรับการหาสถานีรถไฟที่ใกล้ที่สุด ---
+    if (session?.step === "FINDING_NEAREST_TRAIN_STATION") {
       if (msg.type === "location") {
         const userLat = msg.latitude!;
         const userLng = msg.longitude!;
 
-        const busStop = await getNearestBusStop(userLat, userLng);
-        if (!busStop) {
+        const trainStation = await getNearestTrainStation(userLat, userLng);
+        if (!trainStation) {
           await safeReply(
             replyToken,
-            [{ type: "text", text: "ขอโทษครับ ไม่พบป้ายรถเมล์ใกล้กับตำแหน่งของคุณ" }],
+            [{ type: "text", text: "ขอโทษครับ ไม่พบสถานีรถไฟใกล้กับตำแหน่งของคุณ" }],
             "ไม่สามารถส่งข้อความตอบกลับได้"
           );
           await clearSession(lineUserId);
@@ -127,7 +127,7 @@ async function handleEvent(event: WebhookEvent) {
           [
             {
               type: "text",
-              text: `🚏 ป้ายรถเมล์ใกล้ที่สุด:\n\n📍 ${busStop.name}\n\n🚶 ระยะทาง: ${busStop.distanceKm.toFixed(2)} กม.\n⏱️ เวลาเดิน: ${busStop.walkingTimeMin} นาที`,
+              text: `🚆 สถานีรถไฟใกล้ที่สุด:\n\n📍 ${trainStation.name}\n\n🚶 ระยะทาง: ${trainStation.distanceKm.toFixed(2)} กม.\n⏱️ เวลาเดิน: ${trainStation.walkingTimeMin} นาที`,
             },
           ],
           "ไม่สามารถส่งข้อความตอบกลับได้"
@@ -237,7 +237,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\n📍 ส่งตำแหน่งปัจจุบันของคุณเพื่อค้นหาเส้นทางสีเขียว\n\n🚏 หรือพิมพ์ "ป้ายรถเมย์ใกล้ฉัน" เพื่อหาป้ายรถเมล์ที่ใกล้ที่สุด\n\n(Bot v${BOT_VERSION})`,
+      text: `สวัสดีครับ! 🌿 Doodee Move\n\n📍 ส่งตำแหน่งปัจจุบันของคุณเพื่อค้นหาเส้นทางสีเขียว\n\n� หรือพิมพ์ "สถานีรถไฟใกล้ฉัน" เพื่อหาสถานีรถไฟที่ใกล้ที่สุด\n\n(Bot v${BOT_VERSION})`,
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);

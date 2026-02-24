@@ -1,6 +1,6 @@
 import { getPrisma } from "./prisma";
 
-export type SessionStep = "IDLE" | "WAITING_DESTINATION" | "AWAITING_ROUTE" | "FINDING_NEAREST_BUS_STOP";
+export type SessionStep = "IDLE" | "WAITING_DESTINATION" | "AWAITING_ROUTE" | "FINDING_NEAREST_TRAIN_STATION";
 
 export async function getSession(lineUserId: string) {
   const prisma = getPrisma();

@@ -29,19 +29,19 @@ const TRANSIT_MODES = [
   { travelMode: TravelMode.transit, transitMode: TransitMode.bus, key: "BUS" },
 ];
 
-export async function getNearestBusStop(
+export async function getNearestTrainStation(
   lat: number,
   lng: number
 ): Promise<{ name: string; distanceKm: number; walkingTimeMin: number } | null> {
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   
   try {
-    // Find nearest bus stop using nearby search
+    // Find nearest train station using nearby search
     const res = await mapsClient.placesNearby({
       params: {
         location: { lat, lng },
         radius: 2000, // 2km radius
-        type: "bus_station",
+        type: "train_station",
         key,
         language: Language.th,
       },
@@ -81,12 +81,12 @@ export async function getNearestBusStop(
     const walkingTimeMin = Math.ceil(leg.duration.value / 60);
 
     return {
-      name: nearestStop.name || "ป้ายรถเมล์",
+      name: nearestStop.name || "สถานีรถไฟ",
       distanceKm,
       walkingTimeMin,
     };
   } catch (error) {
-    console.error("[maps] getNearestBusStop error", error);
+    console.error("[maps] getNearestTrainStation error", error);
     return null;
   }
 }
