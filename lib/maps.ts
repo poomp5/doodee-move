@@ -40,7 +40,7 @@ export async function getNearestTrainStation(
     const res = await mapsClient.placesNearby({
       params: {
         location: { lat, lng },
-        radius: 2000, // 2km radius
+        radius: 10000, // 2km radius
         type: "train_station",
         key,
         language: Language.th,
