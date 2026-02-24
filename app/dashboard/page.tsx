@@ -1,6 +1,8 @@
 import { getPrisma } from "@/lib/prisma";
 import { Users, Leaf, TrendingUp, Car, Calendar, Route } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function Dashboard() {
   const prisma = getPrisma();
 

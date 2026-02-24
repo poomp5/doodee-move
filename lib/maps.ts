@@ -29,6 +29,68 @@ const TRANSIT_MODES = [
   { travelMode: TravelMode.transit, transitMode: TransitMode.bus, key: "BUS" },
 ];
 
+export async function getNearestBusStop(
+  lat: number,
+  lng: number
+): Promise<{ name: string; distanceKm: number; walkingTimeMin: number } | null> {
+  const key = process.env.GOOGLE_MAPS_API_KEY!;
+  
+  try {
+    // Find nearest bus stop using nearby search
+    const res = await mapsClient.placesNearby({
+      params: {
+        location: { lat, lng },
+        radius: 1000, // 2km radius
+        type: "bus_station",
+        key,
+        language: Language.th,
+      },
+    });
+
+    if (!res.data.results || res.data.results.length === 0) {
+      return null;
+    }
+
+    const nearestStop = res.data.results[0];
+    if (!nearestStop?.geometry?.location) {
+      return null;
+    }
+
+    const stopLat = nearestStop.geometry.location.lat;
+    const stopLng = nearestStop.geometry.location.lng;
+
+    // Calculate walking time to the bus stop
+    const origin = `${lat},${lng}`;
+    const destination = `${stopLat},${stopLng}`;
+
+    const walkRes = await mapsClient.directions({
+      params: {
+        origin,
+        destination,
+        mode: TravelMode.walking,
+        language: Language.th,
+        key,
+      },
+    });
+
+    const walkRoute = walkRes.data.routes[0];
+    if (!walkRoute) return null;
+
+    const leg = walkRoute.legs[0];
+    const distanceKm = leg.distance.value / 1000;
+    const walkingTimeMin = Math.ceil(leg.duration.value / 60);
+
+    return {
+      name: nearestStop.name || "ป้ายรถเมล์",
+      distanceKm,
+      walkingTimeMin,
+    };
+  } catch (error) {
+    console.error("[maps] getNearestBusStop error", error);
+    return null;
+  }
+}
+
 export async function getRoutes(
   originLat: number,
   originLng: number,
