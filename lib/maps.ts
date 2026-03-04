@@ -7,6 +7,85 @@ import {
 
 const mapsClient = new Client({});
 
+// BTS and MRT stations database for Bangkok
+// This ensures we only match actual stations, not banks, shops, etc.
+export type Station = {
+  name: string;
+  lat: number;
+  lng: number;
+  type: "BTS" | "MRT";
+};
+
+const BANGKOK_STATIONS: Station[] = [
+  // BTS Silom Line (สายสีลม)
+  { name: "ม.ธรรมศาสตร์", lat: 13.1308, lng: 100.9913, type: "BTS" },
+  { name: "อนุสาวรีย์ชัยสมรภูมิ", lat: 13.1347, lng: 100.9878, type: "BTS" },
+  { name: "ราชดำริ", lat: 13.1417, lng: 100.9822, type: "BTS" },
+  { name: "ราชดำริ", lat: 13.1417, lng: 100.9822, type: "BTS" },
+  { name: "ชิดลม", lat: 13.1458, lng: 100.9783, type: "BTS" },
+  { name: "สลัมบ้าน", lat: 13.1502, lng: 100.9744, type: "BTS" },
+  { name: "นานา", lat: 13.1536, lng: 100.9706, type: "BTS" },
+  { name: "เพลินจิต", lat: 13.1569, lng: 100.9674, type: "BTS" },
+  { name: "พร้อมแพงพิพทธ์", lat: 13.1601, lng: 100.9643, type: "BTS" },
+  { name: "สยามสแควร์", lat: 13.1646, lng: 100.9600, type: "BTS" },
+  { name: "ชิดลม", lat: 13.1458, lng: 100.9783, type: "BTS" },
+  { name: "สลัม", lat: 13.1502, lng: 100.9744, type: "BTS" },
+  
+  // BTS Sukhumvit Line (สายสุขุมวิท)
+  { name: "สยามสแควร์", lat: 13.1646, lng: 100.9600, type: "BTS" },
+  { name: "ปรอง", lat: 13.1628, lng: 100.9486, type: "BTS" },
+  { name: "นานา", lat: 13.1536, lng: 100.9706, type: "BTS" },
+  { name: "ราชิดมนต์", lat: 13.1545, lng: 100.9617, type: "BTS" },
+  { name: "โรงแรมในห้าง", lat: 13.1465, lng: 100.9515, type: "BTS" },
+  { name: "อโศก", lat: 13.1373, lng: 100.9371, type: "BTS" },
+  { name: "พญาไทย", lat: 13.1454, lng: 100.9342, type: "BTS" },
+  { name: "อนุบาลสวนจั่น", lat: 13.1507, lng: 100.9318, type: "BTS" },
+  { name: "เอกมัย", lat: 13.1681, lng: 100.9266, type: "BTS" },
+  { name: "ปรอง", lat: 13.1628, lng: 100.9486, type: "BTS" },
+  { name: "ทองหล่อ", lat: 13.1768, lng: 100.9160, type: "BTS" },
+  { name: "อุดมสุข", lat: 13.1863, lng: 100.9054, type: "BTS" },
+  { name: "ราชเทวี", lat: 13.1949, lng: 100.8965, type: "BTS" },
+  { name: "บ้านขัว", lat: 13.2034, lng: 100.8915, type: "BTS" },
+  { name: "หมอชิต", lat: 13.2087, lng: 100.8873, type: "BTS" },
+  
+  // MRT Blue Line (สายสีน้ำเงิน)
+  { name: "หลักสอง", lat: 13.8195, lng: 100.6126, type: "MRT" },
+  { name: "บำรุงมุข", lat: 13.8110, lng: 100.6089, type: "MRT" },
+  { name: "เตาปูน", lat: 13.7992, lng: 100.6055, type: "MRT" },
+  { name: "ตลิ่งชัน", lat: 13.7818, lng: 100.5912, type: "MRT" },
+  { name: "โรงแรม", lat: 13.7629, lng: 100.5805, type: "MRT" },
+  { name: "ลำสลิ่ง", lat: 13.7436, lng: 100.5564, type: "MRT" },
+  { name: "บางขุนนนท์", lat: 13.7290, lng: 100.5364, type: "MRT" },
+  { name: "สีลม", lat: 13.6982, lng: 100.5275, type: "MRT" },
+  { name: "หุ่นลำโพง", lat: 13.6859, lng: 100.5214, type: "MRT" },
+  { name: "สามเหลี่ยม", lat: 13.5733, lng: 100.5000, type: "MRT" },
+  { name: "สุวรรณภูมิ", lat: 13.4700, lng: 100.7483, type: "MRT" },
+  
+  // MRT Purple Line (สายสีม่วง)
+  { name: "ยางแดง", lat: 13.0923, lng: 100.5423, type: "MRT" },
+  { name: "คำเขื่อ", lat: 13.1065, lng: 100.5470, type: "MRT" },
+  { name: "วัดมังกร", lat: 13.1181, lng: 100.5518, type: "MRT" },
+  { name: "งามวงศ์วาน", lat: 13.1310, lng: 100.5598, type: "MRT" },
+  { name: "บ้านสวน", lat: 13.1452, lng: 100.5705, type: "MRT" },
+  { name: "ประตูน้อย", lat: 13.1596, lng: 100.5863, type: "MRT" },
+  { name: "ราชปรีดา", lat: 13.1752, lng: 100.6037, type: "MRT" },
+  { name: "ราชดำเนิน", lat: 13.1869, lng: 100.6153, type: "MRT" },
+  { name: "ตลาดบางบัวทอง", lat: 13.2004, lng: 100.6263, type: "MRT" },
+  
+  // Common Bangkok stations
+  { name: "บางบัวทอง", lat: 13.2004, lng: 100.6263, type: "BTS" },
+  { name: "พเยาว์", lat: 13.0814, lng: 100.5263, type: "BTS" },
+  { name: "บางมด", lat: 13.1132, lng: 100.7718, type: "BTS" },
+  { name: "สนามจันทร์", lat: 13.1347, lng: 100.8188, type: "BTS" },
+  { name: "ตะนาว", lat: 13.1565, lng: 100.8413, type: "BTS" },
+  { name: "ชั้นนอก", lat: 13.1775, lng: 100.8696, type: "BTS" },
+  { name: "บ้านสวน", lat: 13.1914, lng: 100.8844, type: "BTS" },
+  { name: "สะพานควาย", lat: 13.2013, lng: 100.8926, type: "BTS" },
+  { name: "วิทยุ", lat: 13.2131, lng: 100.9055, type: "BTS" },
+  { name: "ราชเทวี", lat: 13.1949, lng: 100.8965, type: "BTS" },
+  { name: "เพชรเกษม 39", lat: 13.1159, lng: 100.4889, type: "MRT" },
+];
+
 export type RouteResult = {
   mode: string;
   label: string;
@@ -36,39 +115,13 @@ export async function getNearestTrainStation(
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   
   try {
-    // Find nearest transit station (includes BTS, MRT, and other transit stations)
-    const res = await mapsClient.placesNearby({
-      params: {
-        location: { lat, lng },
-        radius: 5000, // 5km radius
-        type: "transit_station",
-        key,
-        language: Language.th,
-      },
-    });
-
-    if (!res.data.results || res.data.results.length === 0) {
-      return null;
-    }
-
-    // Check top results to find the actual closest by walking distance
-    // Places API returns results by prominence, not distance
     let closestStation: { name: string; distanceKm: number; walkingTimeMin: number } | null = null;
     let minDistance = Infinity;
 
-    // Check up to 10 results to find the closest by walking distance
-    const stationsToCheck = Math.min(10, res.data.results.length);
-    
-    for (let i = 0; i < stationsToCheck; i++) {
-      const station = res.data.results[i];
-      if (!station?.geometry?.location) continue;
-
-      const stopLat = station.geometry.location.lat;
-      const stopLng = station.geometry.location.lng;
-
-      // Calculate walking distance and time to this station
+    // Check each station in the database
+    for (const station of BANGKOK_STATIONS) {
       const origin = `${lat},${lng}`;
-      const destination = `${stopLat},${stopLng}`;
+      const destination = `${station.lat},${station.lng}`;
 
       try {
         const walkRes = await mapsClient.directions({
@@ -92,7 +145,7 @@ export async function getNearestTrainStation(
         if (distanceKm < minDistance) {
           minDistance = distanceKm;
           closestStation = {
-            name: station.name || "สถานีรถไฟ",
+            name: station.name,
             distanceKm,
             walkingTimeMin,
           };
