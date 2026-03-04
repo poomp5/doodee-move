@@ -124,18 +124,31 @@ export async function getNearestTrainStationFromPlace(
 export function parseTrainStationQuery(text: string): { location: string } | null {
   const trimmed = text.trim();
 
+  // Don't match "สถานีรถไฟใกล้ฉัน" - that's handled separately as map pin request
+  if (trimmed === "สถานีรถไฟใกล้ฉัน") {
+    return null;
+  }
+
   // Pattern: "สถานี[...]ใกล้[location]" or "สถานีรถไฟ[...]ใกล้[location]"
   const pattern1 = /สถานี(?:รถไฟ)?.*?ใกล้(.+?)$/;
   const match1 = trimmed.match(pattern1);
   if (match1) {
-    return { location: match1[1].trim() };
+    const location = match1[1].trim();
+    // Don't match if location is just "ฉัน"
+    if (location !== "ฉัน") {
+      return { location };
+    }
   }
 
   // Pattern: "BTS/MRT ใกล้[location]"
   const pattern2 = /(?:BTS|MRT|สถานี).*?ใกล้(.+?)$/;
   const match2 = trimmed.match(pattern2);
   if (match2) {
-    return { location: match2[1].trim() };
+    const location = match2[1].trim();
+    // Don't match if location is just "ฉัน"
+    if (location !== "ฉัน") {
+      return { location };
+    }
   }
 
   return null;

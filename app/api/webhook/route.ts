@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.3.2";
+const BOT_VERSION = "1.3.3";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -86,40 +86,8 @@ async function handleEvent(event: WebhookEvent) {
     if (msg.type === "text") {
       const text = (msg.text ?? "").trim();
       
-      // Check for text-based train station query like "สถานีรถไฟใกล้เดอะมอล"
-      const trainStationQuery = parseTrainStationQuery(text);
-      if (trainStationQuery) {
-        try {
-          const trainStation = await getNearestTrainStationFromPlace(trainStationQuery.location);
-          if (!trainStation) {
-            await safeReply(
-              replyToken,
-              [{ type: "text", text: `ขอโทษครับ ไม่พบสถานีรถไฟใกล้กับ "${trainStationQuery.location}"` }],
-              "ไม่สามารถส่งข้อความตอบกลับได้"
-            );
-            return;
-          }
-
-          await safeReply(
-            replyToken,
-            [
-              {
-                type: "text",
-                text: `🚆 สถานีรถไฟใกล้ที่สุด:\n\n📍 ${trainStation.name}\n\n🚶 ระยะทาง: ${trainStation.distanceKm.toFixed(2)} กม.\n⏱️ เวลาเดิน: ${trainStation.walkingTimeMin} นาที`,
-              },
-            ],
-            "ไม่สามารถส่งข้อความตอบกลับได้"
-          );
-          return;
-        } catch (err) {
-          console.error("[webhook] text-based train station query failed", err);
-          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานี ลองใหม่อีกครั้ง" }]);
-          return;
-        }
-      }
-      
-      // Check for map pin request
-      if (text === "สถานีรถไฟใกล้ฉัน" || text.includes("สถานีรถไฟ")) {
+      // Check for map pin request FIRST (exact match)
+      if (text === "สถานีรถไฟใกล้ฉัน") {
         await setSession({
           lineUserId,
           step: "FINDING_NEAREST_TRAIN_STATION",
@@ -135,6 +103,63 @@ async function handleEvent(event: WebhookEvent) {
           "ไม่สามารถส่งข้อความตอบกลับได้"
         );
         return;
+      }
+
+      // Check for text-based train station query like "สถานีรถไฟใกล้เดอะมอล"
+      const trainStationQuery = parseTrainStationQuery(text);
+      if (trainStationQuery) {
+        try {
+          const trainStation = await getNearestTrainStationFromPlace(trainStationQuery.location);
+          if (!trainStation) {
+            await safeReply(
+              replyToken,
+              [{ type: "text", text: `ขอโทษครับ ไม่พบสถานีรถไฟใกล้กับ "${trainStationQuery.location}"` }],
+              "ไม่สามารถส่งข้อความตอบกลับได้"
+            );
+            return;
+          }
+
+          // Geocode station name to get precise coordinates for route finding
+          const stationCoords = await geocodePlace(trainStation.name);
+          const stationLat = stationCoords?.lat ?? undefined;
+          const stationLng = stationCoords?.lng ?? undefined;
+
+          if (stationLat && stationLng) {
+            // Set session with train station as origin and ask for destination
+            await setSession({
+              lineUserId,
+              step: "WAITING_DESTINATION_FROM_STATION",
+              originLat: stationLat,
+              originLng: stationLng,
+              destLabel: "",
+            });
+          }
+
+          // Show train station details in flex card
+          const stationFlex = buildTrainStationDetailFlex(
+            trainStation.name,
+            trainStation.distanceKm,
+            trainStation.walkingTimeMin
+          ) as any;
+
+          // Reply with station card and prompt for destination
+          await safeReply(
+            replyToken,
+            [
+              stationFlex,
+              {
+                type: "text",
+                text: `✅ พบสถานี!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางครับ`,
+              },
+            ],
+            "ไม่สามารถส่งข้อความตอบกลับได้"
+          );
+          return;
+        } catch (err) {
+          console.error("[webhook] text-based train station query failed", err);
+          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานี ลองใหม่อีกครั้ง" }]);
+          return;
+        }
       }
     }
 
