@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.3.1";
+const BOT_VERSION = "1.3.2";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -13,7 +13,7 @@ import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
 import { getRoutes, getNearestTrainStation, getNearestTrainStationFromPlace, parseThaiDirectionText, parseTrainStationQuery, geocodePlace } from "@/lib/maps";
 import { calcCo2Saved, calcPoints } from "@/lib/carbon";
-import { buildRoutesFlexMessage, buildRouteDetailFlex } from "@/lib/flex";
+import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex } from "@/lib/flex";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -222,13 +222,35 @@ async function handleEvent(event: WebhookEvent) {
           return;
         }
 
-        await clearSession(lineUserId);
+        // Geocode station name to get precise coordinates
+        const stationCoords = await geocodePlace(trainStation.name);
+        const stationLat = stationCoords?.lat ?? userLat;
+        const stationLng = stationCoords?.lng ?? userLng;
+
+        // Set session with train station as origin and ask for destination
+        await setSession({
+          lineUserId,
+          step: "WAITING_DESTINATION_FROM_STATION",
+          originLat: stationLat,
+          originLng: stationLng,
+          destLabel: "",
+        });
+
+        // Show train station details in flex card
+        const stationFlex = buildTrainStationDetailFlex(
+          trainStation.name,
+          trainStation.distanceKm,
+          trainStation.walkingTimeMin
+        ) as any;
+
+        // Reply with station card and prompt for destination
         await safeReply(
           replyToken,
           [
+            stationFlex,
             {
               type: "text",
-              text: `🚆 สถานีรถไฟใกล้ที่สุด:\n\n📍 ${trainStation.name}\n\n🚶 ระยะทาง: ${trainStation.distanceKm.toFixed(2)} กม.\n⏱️ เวลาเดิน: ${trainStation.walkingTimeMin} นาที`,
+              text: `✅ พบสถานี!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางครับ`,
             },
           ],
           "ไม่สามารถส่งข้อความตอบกลับได้"
@@ -265,8 +287,8 @@ async function handleEvent(event: WebhookEvent) {
       return;
     }
 
-    // --- รอปลายทาง ---
-    if (session?.step === "WAITING_DESTINATION") {
+    // --- รอปลายทาง (origin อาจเป็นสถานีรถไฟหรือตำแหน่งปกติ) ---
+    if (session?.step === "WAITING_DESTINATION" || session?.step === "WAITING_DESTINATION_FROM_STATION") {
       const originLat = session.originLat!;
       const originLng = session.originLng!;
       let destLat: number | undefined;

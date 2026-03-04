@@ -318,3 +318,93 @@ export function buildRouteDetailFlex(
     contents: bubble,
   };
 }
+export function buildTrainStationDetailFlex(
+  stationName: string,
+  distanceKm: number,
+  walkingTimeMin: number
+): FlexMessage {
+  const primaryColor = "#2a9c64";
+
+  const bubble: any = {
+    type: "bubble",
+    size: "kilo",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: "🚆 สถานีรถไฟ/ขนส่ง",
+          weight: "bold",
+          size: "lg",
+          color: "#ffffff",
+        },
+      ],
+      backgroundColor: primaryColor,
+      paddingAll: "12px",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        {
+          type: "text",
+          text: stationName,
+          weight: "bold",
+          size: "lg",
+          wrap: true,
+          color: "#333333",
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          spacing: "sm",
+          contents: [
+            {
+              type: "box",
+              layout: "baseline",
+              spacing: "xs",
+              contents: [
+                { type: "text", text: "📍 ระยะทาง:", size: "xs", color: "#999999" },
+                { type: "text", text: `${distanceKm.toFixed(2)} กม.`, size: "xs", weight: "bold", color: "#333333" },
+              ],
+            },
+            {
+              type: "box",
+              layout: "baseline",
+              spacing: "xs",
+              contents: [
+                { type: "text", text: "🚶 เวลาเดิน:", size: "xs", color: "#999999" },
+                { type: "text", text: `${walkingTimeMin} นาที`, size: "xs", weight: "bold", color: "#333333" },
+              ],
+            },
+          ],
+        },
+      ],
+      paddingAll: "12px",
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "text",
+          text: "พิมพ์ชื่อปลายทางเพื่อหาเส้นทางจากสถานีนี้",
+          size: "xs",
+          color: "#999999",
+          wrap: true,
+          align: "center",
+        },
+      ],
+      paddingAll: "12px",
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: `สถานีรถไฟ: ${stationName}`,
+    contents: bubble,
+  };
+}
