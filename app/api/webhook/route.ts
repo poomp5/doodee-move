@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.3.7";
+const BOT_VERSION = "1.3.8";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -169,6 +169,7 @@ async function handleEvent(event: WebhookEvent) {
             }
             searchOriginLat = placeGeocode.lat;
             searchOriginLng = placeGeocode.lng;
+            console.log(`[webhook] Train station search for place "${placeName}" geocoded to (${searchOriginLat}, ${searchOriginLng})`);
           } catch (err) {
             console.error("[webhook] Train station place geocoding failed", err);
             await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานที่ ลองใหม่อีกครั้ง" }]);

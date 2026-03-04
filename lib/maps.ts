@@ -236,6 +236,7 @@ export async function getNearestTrainStationByKeyword(
   const keywords = ["สถานีรถไฟฟ้า", "สถานีรถไฟ", "BTS", "MRT"];
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   let closestStation: { name: string; lat: number; lng: number; distanceKm: number } | null = null;
+  const allResults: Array<{ name: string; distance: number }> = [];
 
   for (const keyword of keywords) {
     try {
@@ -258,6 +259,8 @@ export async function getNearestTrainStationByKeyword(
           const stationLat = result.geometry.location.lat;
           const stationLng = result.geometry.location.lng;
           const distance = calculateDistance(lat, lng, stationLat, stationLng);
+          
+          allResults.push({ name: result.name, distance });
 
           // Keep track of the closest station across all results and keywords
           if (!closestStation || distance < closestStation.distanceKm) {
@@ -274,6 +277,12 @@ export async function getNearestTrainStationByKeyword(
       console.error(`[getNearestTrainStationByKeyword] Error searching keyword "${keyword}":`, err);
     }
   }
+
+  // Log all found stations sorted by distance for debugging
+  console.log(
+    `[getNearestTrainStationByKeyword] Search from (${lat}, ${lng}). Found these stations:`,
+    allResults.sort((a, b) => a.distance - b.distance).slice(0, 5)
+  );
 
   return closestStation;
 }
