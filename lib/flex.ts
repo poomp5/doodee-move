@@ -391,12 +391,14 @@ export function buildTrainStationDetailFlex(
       spacing: "sm",
       contents: [
         {
-          type: "text",
-          text: "ระบบจะหาเส้นทางจากตำแหน่งปัจจุบันไปยังสถานีนี้",
-          size: "xs",
-          color: "#999999",
-          wrap: true,
-          align: "center",
+          type: "button",
+          style: "primary",
+          color: primaryColor,
+          action: {
+            type: "postback",
+            label: "ยืนยันและหาเส้นทาง",
+            data: "action=confirm_station",
+          },
         },
       ],
       paddingAll: "12px",

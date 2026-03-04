@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.3.5";
+const BOT_VERSION = "1.3.6";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -195,33 +195,22 @@ async function handleEvent(event: WebhookEvent) {
             return;
           }
 
-          // Immediately fetch routes from origin to station
-          const routes = await getRoutes(searchOriginLat!, searchOriginLng!, station.lat, station.lng);
-          if (routes.length === 0) {
-            await safeReply(replyToken, [
-              { type: "text", text: `พบสถานี ${station.name} ห่างออกไป ${station.distanceKm.toFixed(2)} กม.` },
-              { type: "text", text: "แต่ไม่พบเส้นทางขนส่งสาธารณะในพื้นที่นี้ ขออภัยครับ" }
-            ]);
-            return;
-          }
-
-          // Save session and show routes
+          // Save session with station info and show confirmation card (NOT routes yet)
           await setSession({
             lineUserId,
-            step: "AWAITING_ROUTE",
+            step: "FOUND_TRAIN_STATION",
             originLat: searchOriginLat,
             originLng: searchOriginLng,
             destLat: station.lat,
             destLng: station.lng,
             destLabel: station.name,
-            pendingRoutes: routes,
           });
 
-          const flexMsg = buildRoutesFlexMessage(routes, station.name) as any;
+          const flexMsg = buildTrainStationDetailFlex(station.name, station.distanceKm) as any;
           await safeReply(
             replyToken,
             [flexMsg],
-            "ระบบส่งการ์ดเส้นทางไม่สำเร็จ"
+            "ระบบส่งการ์ดสถานีไม่สำเร็จ"
           );
           return;
         } catch (err) {
@@ -247,34 +236,22 @@ async function handleEvent(event: WebhookEvent) {
             return;
           }
 
-          // Immediately fetch routes from location to station
-          const routes = await getRoutes(originLat, originLng, station.lat, station.lng);
-          if (routes.length === 0) {
-            await safeReply(replyToken, [
-              { type: "text", text: `พบสถานี ${station.name} ห่างออกไป ${station.distanceKm.toFixed(2)} กม.` },
-              { type: "text", text: "แต่ไม่พบเส้นทางขนส่งสาธารณะในพื้นที่นี้ ขออภัยครับ" }
-            ]);
-            await clearSession(lineUserId);
-            return;
-          }
-
-          // Save session and show routes
+          // Save session with station info and show confirmation card (NOT routes yet)
           await setSession({
             lineUserId,
-            step: "AWAITING_ROUTE",
+            step: "FOUND_TRAIN_STATION",
             originLat,
             originLng,
             destLat: station.lat,
             destLng: station.lng,
             destLabel: station.name,
-            pendingRoutes: routes,
           });
 
-          const flexMsg = buildRoutesFlexMessage(routes, station.name) as any;
+          const flexMsg = buildTrainStationDetailFlex(station.name, station.distanceKm) as any;
           await safeReply(
             replyToken,
             [flexMsg],
-            "ระบบส่งการ์ดเส้นทางไม่สำเร็จ"
+            "ระบบส่งการ์ดสถานีไม่สำเร็จ"
           );
           return;
         } catch (err) {
@@ -321,33 +298,22 @@ async function handleEvent(event: WebhookEvent) {
               return;
             }
 
-            // Immediately fetch routes from origin to station
-            const routes = await getRoutes(originLat, originLng, station.lat, station.lng);
-            if (routes.length === 0) {
-              await safeReply(replyToken, [
-                { type: "text", text: `พบสถานี ${station.name} ห่างออกไป ${station.distanceKm.toFixed(2)} กม.` },
-                { type: "text", text: "แต่ไม่พบเส้นทางขนส่งสาธารณะในพื้นที่นี้ ขออภัยครับ" }
-              ]);
-              return;
-            }
-
-            // Save session and show routes
+            // Save session with station info and show confirmation card (NOT routes yet)
             await setSession({
               lineUserId,
-              step: "AWAITING_ROUTE",
+              step: "FOUND_TRAIN_STATION",
               originLat,
               originLng,
               destLat: station.lat,
               destLng: station.lng,
               destLabel: station.name,
-              pendingRoutes: routes,
             });
 
-            const flexMsg = buildRoutesFlexMessage(routes, station.name) as any;
+            const flexMsg = buildTrainStationDetailFlex(station.name, station.distanceKm) as any;
             await safeReply(
               replyToken,
               [flexMsg],
-              "ระบบส่งการ์ดเส้นทางไม่สำเร็จ"
+              "ระบบส่งการ์ดสถานีไม่สำเร็จ"
             );
             return;
           } catch (err) {
@@ -444,7 +410,60 @@ async function handleEvent(event: WebhookEvent) {
 async function handlePostback(event: WebhookEvent) {
   if (!event.source.userId) return;
   const lineUserId = event.source.userId;
+  const replyToken = event.replyToken;
   const data = event.postback?.data ?? "";
+
+  // Handle train station confirmation
+  if (data === "action=confirm_station") {
+    const session = await getSession(lineUserId);
+    if (!session || session.step !== "FOUND_TRAIN_STATION" || !session.destLat || !session.destLng) {
+      return;
+    }
+
+    try {
+      // Now fetch the routes from origin to the confirmed station
+      const routes = await getRoutes(
+        session.originLat!,
+        session.originLng!,
+        session.destLat,
+        session.destLng
+      );
+
+      if (routes.length === 0) {
+        await safeReply(replyToken, [
+          { type: "text", text: `ไม่พบเส้นทางขนส่งสาธารณะจากตำแหน่งปัจจุบันไปยัง ${session.destLabel}` }
+        ]);
+        await clearSession(lineUserId);
+        return;
+      }
+
+      // Update session to AWAITING_ROUTE with the routes
+      await setSession({
+        lineUserId,
+        step: "AWAITING_ROUTE",
+        originLat: session.originLat!,
+        originLng: session.originLng!,
+        destLat: session.destLat!,
+        destLng: session.destLng!,
+        destLabel: session.destLabel!,
+        pendingRoutes: routes,
+      });
+
+      // Show the routes carousel
+      const flexMsg = buildRoutesFlexMessage(routes, session.destLabel!) as any;
+      await safeReply(
+        replyToken,
+        [flexMsg],
+        "ระบบส่งการ์ดเส้นทางไม่สำเร็จ"
+      );
+      return;
+    } catch (err) {
+      console.error("[webhook] Train station confirmation route lookup failed", err);
+      await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาเส้นทาง ลองใหม่อีกครั้ง" }]);
+      await clearSession(lineUserId);
+      return;
+    }
+  }
 
   if (data.startsWith("route=")) {
     const idx = parseInt(data.slice("route=".length), 10);
