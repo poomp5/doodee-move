@@ -36,12 +36,12 @@ export async function getNearestTrainStation(
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   
   try {
-    // Find nearest train station using nearby search
+    // Find nearest transit station (includes BTS, MRT, and other transit stations)
     const res = await mapsClient.placesNearby({
       params: {
         location: { lat, lng },
-        radius: 10000, // 2km radius
-        type: "train_station",
+        radius: 5000, // 5km radius
+        type: "transit_station",
         key,
         language: Language.th,
       },
@@ -51,7 +51,8 @@ export async function getNearestTrainStation(
       return null;
     }
 
-    const nearestStop = res.data.results[0];
+    // Find the closest station
+    let nearestStop = res.data.results[0];
     if (!nearestStop?.geometry?.location) {
       return null;
     }
@@ -59,7 +60,7 @@ export async function getNearestTrainStation(
     const stopLat = nearestStop.geometry.location.lat;
     const stopLng = nearestStop.geometry.location.lng;
 
-    // Calculate walking time to the bus stop
+    // Calculate walking distance and time to the station
     const origin = `${lat},${lng}`;
     const destination = `${stopLat},${stopLng}`;
 
@@ -87,6 +88,81 @@ export async function getNearestTrainStation(
     };
   } catch (error) {
     console.error("[maps] getNearestTrainStation error", error);
+    return null;
+  }
+}
+
+/**
+ * Find nearest train station from a place (by name)
+ * Usage: "สถานีรถไฟใกล้เดอะมอล" -> finds nearest station from The Mall
+ */
+export async function getNearestTrainStationFromPlace(
+  placeName: string
+): Promise<{ name: string; distanceKm: number; walkingTimeMin: number } | null> {
+  try {
+    // First geocode the place
+    const placeGeocode = await geocodePlace(placeName);
+    if (!placeGeocode) {
+      return null;
+    }
+
+    // Then find nearest station from that location
+    return getNearestTrainStation(placeGeocode.lat, placeGeocode.lng);
+  } catch (error) {
+    console.error("[maps] getNearestTrainStationFromPlace error", error);
+    return null;
+  }
+}
+
+/**
+ * Parse Thai text for train station queries
+ * Supports formats like:
+ * - "สถานีรถไฟใกล้เดอะมอล" (nearest train station from The Mall)
+ * - "สถานีใกล้เดอะมอล" (nearest station from The Mall)
+ * - "BTS ใกล้เดอะมอล" (nearest BTS from The Mall)
+ */
+export function parseTrainStationQuery(text: string): { location: string } | null {
+  const trimmed = text.trim();
+
+  // Pattern: "สถานี[...]ใกล้[location]" or "สถานีรถไฟ[...]ใกล้[location]"
+  const pattern1 = /สถานี(?:รถไฟ)?.*?ใกล้(.+?)$/;
+  const match1 = trimmed.match(pattern1);
+  if (match1) {
+    return { location: match1[1].trim() };
+  }
+
+  // Pattern: "BTS/MRT ใกล้[location]"
+  const pattern2 = /(?:BTS|MRT|สถานี).*?ใกล้(.+?)$/;
+  const match2 = trimmed.match(pattern2);
+  if (match2) {
+    return { location: match2[1].trim() };
+  }
+
+  return null;
+}
+
+/**
+ * Geocode a place name to coordinates
+ * Uses Google Geocoding API with Bangkok, Thailand context
+ */
+export async function geocodePlace(query: string): Promise<{ lat: number; lng: number } | null> {
+  const key = process.env.GOOGLE_MAPS_API_KEY!;
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(query + " Bangkok Thailand")}&key=${key}&language=th`;
+  
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    if (data?.results?.[0]?.partial_match) {
+      console.warn("[maps] Geocode partial_match", { query, topResult: data.results[0].formatted_address });
+    }
+    
+    if (data.status !== "OK" || !data.results[0]) return null;
+    
+    const loc = data.results[0].geometry.location;
+    return { lat: loc.lat, lng: loc.lng };
+  } catch (error) {
+    console.error("[maps] geocodePlace error", error);
     return null;
   }
 }
