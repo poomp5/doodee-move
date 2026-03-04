@@ -227,7 +227,8 @@ export async function geocodePlace(placeName: string): Promise<{ lat: number; ln
 
 /**
  * Find the closest train station by keyword search
- * Tries multiple keyword variations to maximize station coverage
+ * Uses walking distance (via Google Distance Matrix) instead of straight-line distance
+ * to account for geographical barriers like rivers/canals in Bangkok
  */
 export async function getNearestTrainStationByKeyword(
   lat: number,
@@ -252,8 +253,9 @@ export async function getNearestTrainStationByKeyword(
   ];
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   let closestStation: { name: string; lat: number; lng: number; distanceKm: number } | null = null;
-  const allResults: Array<{ name: string; distance: number }> = [];
+  const candidateStations: Array<{ name: string; lat: number; lng: number }> = [];
 
+  // First pass: collect all candidate stations from keyword searches
   for (const keyword of keywords) {
     try {
       const res = await mapsClient.placesNearby({
@@ -266,26 +268,20 @@ export async function getNearestTrainStationByKeyword(
         },
       });
 
-      // Check ALL results from this keyword, not just the first one
-      // Google sorts by relevance, not distance, so we need to find the closest
       if (res.data.results && res.data.results.length > 0) {
         for (const result of res.data.results) {
           if (!result.geometry || !result.name) continue;
           
           const stationLat = result.geometry.location.lat;
           const stationLng = result.geometry.location.lng;
-          const distance = calculateDistance(lat, lng, stationLat, stationLng);
           
-          allResults.push({ name: result.name, distance });
-
-          // Keep track of the closest station across all results and keywords
-          if (!closestStation || distance < closestStation.distanceKm) {
-            closestStation = {
+          // Check if we already have this station (avoid duplicates)
+          if (!candidateStations.some(s => Math.abs(s.lat - stationLat) < 0.001 && Math.abs(s.lng - stationLng) < 0.001)) {
+            candidateStations.push({
               name: result.name,
               lat: stationLat,
               lng: stationLng,
-              distanceKm: distance,
-            };
+            });
           }
         }
       }
@@ -294,11 +290,78 @@ export async function getNearestTrainStationByKeyword(
     }
   }
 
-  // Log all found stations sorted by distance for debugging
-  console.log(
-    `[getNearestTrainStationByKeyword] Search from (${lat}, ${lng}). Found these stations:`,
-    allResults.sort((a, b) => a.distance - b.distance).slice(0, 5)
-  );
+  if (candidateStations.length === 0) return null;
+
+  // Second pass: calculate actual walking distance for each candidate station
+  const origin = `${lat},${lng}`;
+  const destinations = candidateStations.map(s => `${s.lat},${s.lng}`);
+  
+  try {
+    const res = await mapsClient.distancematrix({
+      params: {
+        origins: [origin],
+        destinations,
+        mode: TravelMode.walking,
+        language: Language.th,
+        key,
+      },
+    });
+
+    const allResults: Array<{ name: string; distance: number }> = [];
+
+    if (res.data.rows && res.data.rows[0] && res.data.rows[0].elements) {
+      const elements = res.data.rows[0].elements;
+      
+      for (let i = 0; i < candidateStations.length; i++) {
+        const station = candidateStations[i];
+        const element = elements[i];
+        
+        if (element.status === "OK" && element.distance) {
+          const distanceKm = element.distance.value / 1000;
+          allResults.push({ name: station.name, distance: distanceKm });
+          
+          // Track the closest station
+          if (!closestStation || distanceKm < closestStation.distanceKm) {
+            closestStation = {
+              name: station.name,
+              lat: station.lat,
+              lng: station.lng,
+              distanceKm,
+            };
+          }
+        }
+      }
+    }
+
+    // Log all found stations sorted by walking distance
+    console.log(
+      `[getNearestTrainStationByKeyword] Search from (${lat}, ${lng}) using WALKING distance. Found:`,
+      allResults.sort((a, b) => a.distance - b.distance).slice(0, 5)
+    );
+  } catch (err) {
+    console.error("[getNearestTrainStationByKeyword] Distance Matrix error:", err);
+    // Fallback to straight-line distance if Distance Matrix API fails
+    const allResults: Array<{ name: string; distance: number }> = [];
+    
+    for (const station of candidateStations) {
+      const distance = calculateDistance(lat, lng, station.lat, station.lng);
+      allResults.push({ name: station.name, distance });
+      
+      if (!closestStation || distance < closestStation.distanceKm) {
+        closestStation = {
+          name: station.name,
+          lat: station.lat,
+          lng: station.lng,
+          distanceKm: distance,
+        };
+      }
+    }
+    
+    console.log(
+      `[getNearestTrainStationByKeyword] Using fallback straight-line distance:`,
+      allResults.sort((a, b) => a.distance - b.distance).slice(0, 5)
+    );
+  }
 
   return closestStation;
 }
