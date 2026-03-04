@@ -219,3 +219,45 @@ export async function getRoutes(
 
   return results;
 }
+/**
+ * Parse Thai text to extract origin and destination
+ * Supports formats like:
+ * - "ไปสยามจากเดอะมอล" (go to Siam from The Mall)
+ * - "เดอะมอลไปสยาม" (The Mall go to Siam)
+ * - "จากเดอะมอลไปสยาม" (from The Mall go to Siam)
+ */
+export function parseThaiDirectionText(text: string): { origin: string; destination: string } | null {
+  const trimmed = text.trim();
+  
+  // Pattern 1: "ไป[destination]จาก[origin]"
+  const pattern1 = /ไป(.+?)จาก(.+?)$/;
+  const match1 = trimmed.match(pattern1);
+  if (match1) {
+    return {
+      destination: match1[1].trim(),
+      origin: match1[2].trim(),
+    };
+  }
+
+  // Pattern 2: "จาก[origin]ไป[destination]"
+  const pattern2 = /จาก(.+?)ไป(.+?)$/;
+  const match2 = trimmed.match(pattern2);
+  if (match2) {
+    return {
+      origin: match2[1].trim(),
+      destination: match2[2].trim(),
+    };
+  }
+
+  // Pattern 3: "[origin]ไป[destination]"
+  const pattern3 = /^(.+?)ไป(.+?)$/;
+  const match3 = trimmed.match(pattern3);
+  if (match3) {
+    return {
+      origin: match3[1].trim(),
+      destination: match3[2].trim(),
+    };
+  }
+
+  return null;
+}

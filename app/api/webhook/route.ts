@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.2.13";
+const BOT_VERSION = "1.3.0";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -11,7 +11,7 @@ const BOT_VERSION = "1.2.13";
 type WebhookEvent = any;
 import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
-import { getRoutes, getNearestTrainStation } from "@/lib/maps";
+import { getRoutes, getNearestTrainStation, parseThaiDirectionText } from "@/lib/maps";
 import { calcCo2Saved, calcPoints } from "@/lib/carbon";
 import { buildRoutesFlexMessage, buildRouteDetailFlex } from "@/lib/flex";
 
@@ -104,6 +104,73 @@ async function handleEvent(event: WebhookEvent) {
       }
     }
 
+    // --- Check for text-based direction (e.g., "ไปสยามจากเดอะมอล") ---
+    if (msg.type === "text") {
+      const text = (msg.text ?? "").trim();
+      const parsed = parseThaiDirectionText(text);
+      
+      if (parsed) {
+        // User wants to find a route using text-based input
+        const originText = parsed.origin;
+        const destText = parsed.destination;
+        
+        try {
+          // Geocode both origin and destination
+          const originGeocode = await geocodePlace(originText);
+          if (!originGeocode) {
+            await safeReply(
+              replyToken,
+              [{ type: "text", text: `ไม่พบสถานที่ต้นทาง "${originText}" ลองพิมพ์ใหม่หรือส่ง location ต้นทางแทนครับ` }],
+              "ไม่สามารถส่งข้อความตอบกลับได้"
+            );
+            return;
+          }
+
+          const destGeocode = await geocodePlace(destText);
+          if (!destGeocode) {
+            await safeReply(
+              replyToken,
+              [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่ง location ปลายทางแทนครับ` }],
+              "ไม่สามารถส่งข้อความตอบกลับได้"
+            );
+            return;
+          }
+
+          // หาเส้นทาง
+          const routes = await getRoutes(originGeocode.lat, originGeocode.lng, destGeocode.lat, destGeocode.lng);
+          if (routes.length === 0) {
+            await safeReply(replyToken, [{ type: "text", text: "ขอโทษครับ ไม่พบเส้นทางขนส่งสาธารณะหรือทางเลือกสีเขียวในพื้นที่นี้" }]);
+            return;
+          }
+
+          // store session state
+          await setSession({
+            lineUserId,
+            step: "AWAITING_ROUTE",
+            originLat: originGeocode.lat,
+            originLng: originGeocode.lng,
+            destLat: destGeocode.lat,
+            destLng: destGeocode.lng,
+            destLabel: destText,
+            pendingRoutes: routes,
+          });
+
+          // send the flex carousel
+          const flexMsg = buildRoutesFlexMessage(routes, destText) as any;
+          await safeReply(
+            replyToken,
+            [flexMsg],
+            "ระบบส่งการ์ดเส้นทางไม่สำเร็จ ลองพิมพ์ปลายทางอีกครั้ง หรือส่ง location ปลายทางครับ"
+          );
+          return;
+        } catch (err) {
+          console.error("[webhook] text-based direction failed", err);
+          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาเส้นทาง ลองใหม่อีกครั้ง" }]);
+          return;
+        }
+      }
+    }
+
     // --- รับ Location สำหรับการหาสถานีรถไฟที่ใกล้ที่สุด ---
     if (session?.step === "FINDING_NEAREST_TRAIN_STATION") {
       if (msg.type === "location") {
@@ -156,7 +223,7 @@ async function handleEvent(event: WebhookEvent) {
         [
           {
             type: "text",
-            text: `📍 รับตำแหน่งของคุณแล้ว!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางเลยครับ (Bot v${BOT_VERSION})`,
+            text: `📍 รับตำแหน่งของคุณแล้ว!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางเลยครับ\n\n💡 เคล็ดลับ: คุณสามารถพิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลยครับ\n\n(Bot v${BOT_VERSION})`,
           },
         ],
         "ไม่สามารถส่งข้อความตอบกลับได้ กรุณาลองส่งตำแหน่งอีกครั้ง"
@@ -237,7 +304,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\n📍 ส่งตำแหน่งปัจจุบันของคุณเพื่อค้นหาเส้นทางสีเขียว\n\n� หรือพิมพ์ "สถานีรถไฟใกล้ฉัน" เพื่อหาสถานีรถไฟที่ใกล้ที่สุด\n\n(Bot v${BOT_VERSION})`,
+      text: `สวัสดีครับ! 🌿 Doodee Move\n\n📍 วิธีค้นหาเส้นทาง:\n\n1️⃣ ส่งตำแหน่งปัจจุบันของคุณแล้วพิมพ์/ส่งปลายทาง\n\n2️⃣ หรือพิมพ์โดยตรง เช่น "เดอะมอลไปสยาม" หรือ "ไปสยามจากเดอะมอล"\n\n🚆 พิมพ์ "สถานีรถไฟใกล้ฉัน" เพื่อหาสถานีรถไฟที่ใกล้ที่สุด\n\n(Bot v${BOT_VERSION})`,
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
