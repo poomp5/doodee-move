@@ -233,7 +233,23 @@ export async function getNearestTrainStationByKeyword(
   lat: number,
   lng: number
 ): Promise<{ name: string; lat: number; lng: number; distanceKm: number } | null> {
-  const keywords = ["สถานีรถไฟฟ้า", "สถานีรถไฟ", "BTS", "MRT"];
+  // Use comprehensive keywords including station names, line names, and general transit terms
+  const keywords = [
+    "สถานีรถไฟฟ้า",
+    "สถานีรถไฟ",
+    "BTS",
+    "MRT",
+    "หลักสอง", // Lak Song
+    "ลักษมณ", // Laksi
+    "สายสีน้ำเงิน", // Blue Line
+    "สายสีเขียว", // Green Line
+    "สายสีสีเทา", // Gray Line
+    "สายสีม่วง", // Purple Line
+    "สายสีแดง", // Red Line
+    "สายสีส้ม", // Orange Line
+    "สายสีชมพู", // Pink Line
+    "สายสีเหลือง", // Yellow Line
+  ];
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   let closestStation: { name: string; lat: number; lng: number; distanceKm: number } | null = null;
   const allResults: Array<{ name: string; distance: number }> = [];
