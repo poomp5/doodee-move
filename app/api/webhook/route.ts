@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.3.3";
+const BOT_VERSION = "1.3.4";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We

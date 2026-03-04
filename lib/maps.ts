@@ -51,41 +51,59 @@ export async function getNearestTrainStation(
       return null;
     }
 
-    // Find the closest station
-    let nearestStop = res.data.results[0];
-    if (!nearestStop?.geometry?.location) {
-      return null;
+    // Check top results to find the actual closest by walking distance
+    // Places API returns results by prominence, not distance
+    let closestStation: { name: string; distanceKm: number; walkingTimeMin: number } | null = null;
+    let minDistance = Infinity;
+
+    // Check up to 10 results to find the closest by walking distance
+    const stationsToCheck = Math.min(10, res.data.results.length);
+    
+    for (let i = 0; i < stationsToCheck; i++) {
+      const station = res.data.results[i];
+      if (!station?.geometry?.location) continue;
+
+      const stopLat = station.geometry.location.lat;
+      const stopLng = station.geometry.location.lng;
+
+      // Calculate walking distance and time to this station
+      const origin = `${lat},${lng}`;
+      const destination = `${stopLat},${stopLng}`;
+
+      try {
+        const walkRes = await mapsClient.directions({
+          params: {
+            origin,
+            destination,
+            mode: TravelMode.walking,
+            language: Language.th,
+            key,
+          },
+        });
+
+        const walkRoute = walkRes.data.routes[0];
+        if (!walkRoute) continue;
+
+        const leg = walkRoute.legs[0];
+        const distanceKm = leg.distance.value / 1000;
+        const walkingTimeMin = Math.ceil(leg.duration.value / 60);
+
+        // Keep track of the closest station
+        if (distanceKm < minDistance) {
+          minDistance = distanceKm;
+          closestStation = {
+            name: station.name || "สถานีรถไฟ",
+            distanceKm,
+            walkingTimeMin,
+          };
+        }
+      } catch {
+        // Skip this station if directions calculation fails
+        continue;
+      }
     }
 
-    const stopLat = nearestStop.geometry.location.lat;
-    const stopLng = nearestStop.geometry.location.lng;
-
-    // Calculate walking distance and time to the station
-    const origin = `${lat},${lng}`;
-    const destination = `${stopLat},${stopLng}`;
-
-    const walkRes = await mapsClient.directions({
-      params: {
-        origin,
-        destination,
-        mode: TravelMode.walking,
-        language: Language.th,
-        key,
-      },
-    });
-
-    const walkRoute = walkRes.data.routes[0];
-    if (!walkRoute) return null;
-
-    const leg = walkRoute.legs[0];
-    const distanceKm = leg.distance.value / 1000;
-    const walkingTimeMin = Math.ceil(leg.duration.value / 60);
-
-    return {
-      name: nearestStop.name || "สถานีรถไฟ",
-      distanceKm,
-      walkingTimeMin,
-    };
+    return closestStation;
   } catch (error) {
     console.error("[maps] getNearestTrainStation error", error);
     return null;
