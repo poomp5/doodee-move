@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.4.2";
+const BOT_VERSION = "1.4.3";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -98,8 +98,7 @@ async function handleEvent(event: WebhookEvent) {
           if (!originGeocode) {
             await safeReply(
               replyToken,
-              [{ type: "text", text: `ไม่พบสถานที่ต้นทาง "${originText}" ลองพิมพ์ใหม่หรือส่ง location ต้นทางแทนครับ` }],
-              "ไม่สามารถส่งข้อความตอบกลับได้"
+              [{ type: "text", text: `ไม่พบสถานที่ต้นทาง "${originText}" ลองพิมพ์ใหม่หรือส่ง location ต้นทางแทนครับ` }]
             );
             return;
           }
@@ -108,8 +107,7 @@ async function handleEvent(event: WebhookEvent) {
           if (!destGeocode) {
             await safeReply(
               replyToken,
-              [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่ง location ปลายทางแทนครับ` }],
-              "ไม่สามารถส่งข้อความตอบกลับได้"
+              [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่ง location ปลายทางแทนครับ` }]
             );
             return;
           }
@@ -137,8 +135,7 @@ async function handleEvent(event: WebhookEvent) {
           const flexMsg = buildRoutesFlexMessage(routes, destText) as any;
           await safeReply(
             replyToken,
-            [flexMsg],
-            "ระบบส่งการ์ดเส้นทางไม่สำเร็จ ลองพิมพ์ปลายทางอีกครั้ง หรือส่ง location ปลายทางครับ"
+            [flexMsg]
           );
           return;
         } catch (err) {
@@ -210,8 +207,7 @@ async function handleEvent(event: WebhookEvent) {
           const flexMsg = buildTrainStationDetailFlex(station.name, station.distanceKm) as any;
           await safeReply(
             replyToken,
-            [flexMsg],
-            "ระบบส่งการ์ดสถานีไม่สำเร็จ"
+            [flexMsg]
           );
           return;
         } catch (err) {
@@ -251,8 +247,7 @@ async function handleEvent(event: WebhookEvent) {
           const flexMsg = buildTrainStationDetailFlex(station.name, station.distanceKm) as any;
           await safeReply(
             replyToken,
-            [flexMsg],
-            "ระบบส่งการ์ดสถานีไม่สำเร็จ"
+            [flexMsg]
           );
           return;
         } catch (err) {
@@ -277,8 +272,7 @@ async function handleEvent(event: WebhookEvent) {
             type: "text",
             text: `📍 รับตำแหน่งของคุณแล้ว!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางเลยครับ\n\n💡 เคล็ดลับ: คุณสามารถพิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลยครับ\n\n(Bot v${BOT_VERSION})`,
           },
-        ],
-        "ไม่สามารถส่งข้อความตอบกลับได้ กรุณาลองส่งตำแหน่งอีกครั้ง"
+        ]
       );
       return;
     }
@@ -313,8 +307,7 @@ async function handleEvent(event: WebhookEvent) {
             const flexMsg = buildTrainStationDetailFlex(station.name, station.distanceKm) as any;
             await safeReply(
               replyToken,
-              [flexMsg],
-              "ระบบส่งการ์ดสถานีไม่สำเร็จ"
+              [flexMsg]
             );
             return;
           } catch (err) {
@@ -348,8 +341,7 @@ async function handleEvent(event: WebhookEvent) {
         if (!geocoded) {
           await safeReply(
             replyToken,
-            [{ type: "text", text: `ไม่พบสถานที่ "${text}" ลองพิมพ์ใหม่หรือส่ง location ปลายทางแทนครับ` }],
-            "ไม่สามารถส่งข้อความตอบกลับได้ กรุณาลองพิมพ์ปลายทางใหม่"
+            [{ type: "text", text: `ไม่พบสถานที่ "${text}" ลองพิมพ์ใหม่หรือส่ง location ปลายทางแทนครับ` }]
           );
           return;
         }
@@ -383,8 +375,7 @@ async function handleEvent(event: WebhookEvent) {
       const flexMsg = buildRoutesFlexMessage(routes, destLabel) as any;
       await safeReply(
         replyToken,
-        [flexMsg],
-        "ระบบส่งการ์ดเส้นทางไม่สำเร็จ ลองพิมพ์ปลายทางอีกครั้ง หรือส่ง location ปลายทางครับ"
+        [flexMsg]
       );
       return;
     }
@@ -454,8 +445,7 @@ async function handlePostback(event: WebhookEvent) {
       const flexMsg = buildRoutesFlexMessage(routes, session.destLabel!) as any;
       await safeReply(
         replyToken,
-        [flexMsg],
-        "ระบบส่งการ์ดเส้นทางไม่สำเร็จ"
+        [flexMsg]
       );
       return;
     } catch (err) {
@@ -539,22 +529,12 @@ async function handlePostback(event: WebhookEvent) {
 
 async function safeReply(
   replyToken: string,
-  messages: any[],
-  fallbackText?: string
+  messages: any[]
 ): Promise<void> {
   try {
     await lineClient.replyMessage({ replyToken, messages });
   } catch (error) {
     console.error("[webhook] LINE reply failed", error);
-    if (!fallbackText) return;
-
-    try {
-      await lineClient.replyMessage({
-        replyToken,
-        messages: [{ type: "text", text: fallbackText }],
-      });
-    } catch (fallbackError) {
-      console.error("[webhook] LINE fallback reply failed", fallbackError);
-    }
+    // Don't attempt fallback - reply token expires quickly and can't be reused
   }
 }

@@ -226,102 +226,50 @@ export async function geocodePlace(placeName: string): Promise<{ lat: number; ln
 }
 
 /**
- * Find the closest train station by keyword search
- * Searches with comprehensive keywords including all Bangkok station names
+ * Find the closest train station by type filter
+ * Uses type: "subway_station" to only get actual transit stations
  */
 export async function getNearestTrainStationByKeyword(
   lat: number,
   lng: number
 ): Promise<{ name: string; lat: number; lng: number; distanceKm: number } | null> {
-  // Comprehensive list of Bangkok BTS, MRT, and train station keywords
-  // Includes station names, line names, abbreviations, and Thai transit terms
-  const keywords = [
-    "สถานีรถไฟฟ้า",
-    "สถานีรถไฟ",
-    "BTS",
-    "MRT",
-    "รถไฟฟ้า",
-    "รถไฟ",
-    // MRT stations
-    "หลักสอง",      // Lak Song
-    "ลักษมณ",       // Laksi
-    "ศาลายา",       // Salaya
-    "นนทบุรี",      // Nonthaburi
-    "ปากเกร็ด",     // Pak Kret
-    "แสนแสบ",       // Saen Saeb
-    "วัฒนา",        // Wat Thana
-    // BTS stations
-    "สยาม",         // Siam
-    "นานา",         // Nana
-    "พระโขนง",      // Phra Khanong
-    "บางนา",        // Bang Na
-    "ต้นสน",        // Ton Son
-    "อนุสาวรีย์",    // Anusawari
-    "ปทุมวัน",       // Pathumwan
-    "ราชเทวี",      // Ratchathewi
-    "บ้านทับ",      // Ban Thap
-    "ทับ",          // Thap
-    "สวนลุม",       // Suan Lum
-    "เพลินจิต",     // Phloen Chit
-    "ปรุโปรย",      // Prom Phong
-    "ทองหล่อ",      // Thong Lo
-    "ธนา",          // Thana
-    "อ่อนนุช",      // On Nut
-    "ลาดพร้าว",     // Lat Phrao
-    "บ้านจันทร์",    // Ban Chan
-    "มีนบุรี",      // Min Buri
-    "ท่าพระ",       // Tha Phra
-    "บางแค",        // Bang Khae
-    // Color lines
-    "สายสีน้ำเงิน",  // Blue Line
-    "สายสีเขียว",   // Green Line
-    "สายสีม่วง",    // Purple Line
-    "สายสีแดง",     // Red Line
-    "สายสีส้ม",     // Orange Line
-    "สายสีชมพู",    // Pink Line
-    "สายสีเหลือง",  // Yellow Line
-    "สายสีเทา",     // Gray Line
-  ];
-  
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   let closestStation: { name: string; lat: number; lng: number; distanceKm: number } | null = null;
   const allFound: Map<string, { lat: number; lng: number; distance: number }> = new Map();
 
-  for (const keyword of keywords) {
-    try {
-      const res = await mapsClient.placesNearby({
-        params: {
-          location: { lat, lng },
-          radius: 50000,
-          keyword,
-          language: Language.th,
-          key,
-        },
-      });
+  try {
+    // Search for subway_station type - this is much more reliable than keywords
+    const res = await mapsClient.placesNearby({
+      params: {
+        location: { lat, lng },
+        radius: 50000,
+        type: "subway_station", // Only get actual train/subway stations
+        language: Language.th,
+        key,
+      },
+    });
 
-      // Check ALL results (up to 20) from Places API
-      if (res.data.results && res.data.results.length > 0) {
-        for (const result of res.data.results) {
-          if (!result.geometry || !result.name) continue;
-          
-          const stationLat = result.geometry.location.lat;
-          const stationLng = result.geometry.location.lng;
-          const distance = calculateDistance(lat, lng, stationLat, stationLng);
-          const key = `${result.name}:${stationLat}:${stationLng}`;
-          
-          // Keep the closest occurrence of each station
-          if (!allFound.has(key) || allFound.get(key)!.distance > distance) {
-            allFound.set(key, {
-              lat: stationLat,
-              lng: stationLng,
-              distance,
-            });
-          }
+    if (res.data.results && res.data.results.length > 0) {
+      for (const result of res.data.results) {
+        if (!result.geometry || !result.name) continue;
+        
+        const stationLat = result.geometry.location.lat;
+        const stationLng = result.geometry.location.lng;
+        const distance = calculateDistance(lat, lng, stationLat, stationLng);
+        const stationKey = `${result.name}:${stationLat}:${stationLng}`;
+        
+        // Keep the closest occurrence of each station
+        if (!allFound.has(stationKey) || allFound.get(stationKey)!.distance > distance) {
+          allFound.set(stationKey, {
+            lat: stationLat,
+            lng: stationLng,
+            distance,
+          });
         }
       }
-    } catch (err) {
-      console.error(`[getNearestTrainStationByKeyword] Error searching keyword "${keyword}":`, err);
     }
+  } catch (err) {
+    console.error("[getNearestTrainStationByKeyword] subway_station search error:", err);
   }
 
   // Find the absolute closest one
@@ -356,7 +304,7 @@ export async function getNearestTrainStationByKeyword(
     .slice(0, 5);
 
   console.log(
-    `[getNearestTrainStationByKeyword] Search from (${lat}, ${lng}). Top 5 closest:`,
+    `[getNearestTrainStationByKeyword] Search from (${lat}, ${lng}) by subway_station type. Found ${allFound.size} stations. Top 5:`,
     sortedResults
   );
 
