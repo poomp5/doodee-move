@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient } from "@/lib/line";
 
-const BOT_VERSION = "1.4.1";
+const BOT_VERSION = "1.4.2";
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -192,7 +192,7 @@ async function handleEvent(event: WebhookEvent) {
         try {
           const station = await getNearestTrainStationByKeyword(searchOriginLat!, searchOriginLng!);
           if (!station) {
-            await safeReply(replyToken, [{ type: "text", text: "ขออทัศนีย์ครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
+            await safeReply(replyToken, [{ type: "text", text: "ขออภัยครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
             return;
           }
 
@@ -232,7 +232,7 @@ async function handleEvent(event: WebhookEvent) {
         try {
           const station = await getNearestTrainStationByKeyword(originLat, originLng);
           if (!station) {
-            await safeReply(replyToken, [{ type: "text", text: "ขออทัศนีย์ครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
+            await safeReply(replyToken, [{ type: "text", text: "ขอโทษครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
             await clearSession(lineUserId);
             return;
           }
@@ -295,7 +295,7 @@ async function handleEvent(event: WebhookEvent) {
           try {
             const station = await getNearestTrainStationByKeyword(originLat, originLng);
             if (!station) {
-              await safeReply(replyToken, [{ type: "text", text: "ขออทัศนีย์ครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
+              await safeReply(replyToken, [{ type: "text", text: "ขออภัยครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
               return;
             }
 

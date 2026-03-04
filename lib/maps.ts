@@ -227,60 +227,94 @@ export async function geocodePlace(placeName: string): Promise<{ lat: number; ln
 
 /**
  * Find the closest train station by keyword search
- * Uses walking distance (via Google Distance Matrix) instead of straight-line distance
- * to account for geographical barriers like rivers/canals in Bangkok
+ * Searches with comprehensive keywords including all Bangkok station names
  */
 export async function getNearestTrainStationByKeyword(
   lat: number,
   lng: number
 ): Promise<{ name: string; lat: number; lng: number; distanceKm: number } | null> {
-  // Use comprehensive keywords including station names, line names, and general transit terms
+  // Comprehensive list of Bangkok BTS, MRT, and train station keywords
+  // Includes station names, line names, abbreviations, and Thai transit terms
   const keywords = [
     "สถานีรถไฟฟ้า",
     "สถานีรถไฟ",
     "BTS",
     "MRT",
-    "หลักสอง", // Lak Song
-    "ลักษมณ", // Laksi
-    "สายสีน้ำเงิน", // Blue Line
-    "สายสีเขียว", // Green Line
-    "สายสีสีเทา", // Gray Line
-    "สายสีม่วง", // Purple Line
-    "สายสีแดง", // Red Line
-    "สายสีส้ม", // Orange Line
-    "สายสีชมพู", // Pink Line
-    "สายสีเหลือง", // Yellow Line
+    "รถไฟฟ้า",
+    "รถไฟ",
+    // MRT stations
+    "หลักสอง",      // Lak Song
+    "ลักษมณ",       // Laksi
+    "ศาลายา",       // Salaya
+    "นนทบุรี",      // Nonthaburi
+    "ปากเกร็ด",     // Pak Kret
+    "แสนแสบ",       // Saen Saeb
+    "วัฒนา",        // Wat Thana
+    // BTS stations
+    "สยาม",         // Siam
+    "นานา",         // Nana
+    "พระโขนง",      // Phra Khanong
+    "บางนา",        // Bang Na
+    "ต้นสน",        // Ton Son
+    "อนุสาวรีย์",    // Anusawari
+    "ปทุมวัน",       // Pathumwan
+    "ราชเทวี",      // Ratchathewi
+    "บ้านทับ",      // Ban Thap
+    "ทับ",          // Thap
+    "สวนลุม",       // Suan Lum
+    "เพลินจิต",     // Phloen Chit
+    "ปรุโปรย",      // Prom Phong
+    "ทองหล่อ",      // Thong Lo
+    "ธนา",          // Thana
+    "อ่อนนุช",      // On Nut
+    "ลาดพร้าว",     // Lat Phrao
+    "บ้านจันทร์",    // Ban Chan
+    "มีนบุรี",      // Min Buri
+    "ท่าพระ",       // Tha Phra
+    "บางแค",        // Bang Khae
+    // Color lines
+    "สายสีน้ำเงิน",  // Blue Line
+    "สายสีเขียว",   // Green Line
+    "สายสีม่วง",    // Purple Line
+    "สายสีแดง",     // Red Line
+    "สายสีส้ม",     // Orange Line
+    "สายสีชมพู",    // Pink Line
+    "สายสีเหลือง",  // Yellow Line
+    "สายสีเทา",     // Gray Line
   ];
+  
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   let closestStation: { name: string; lat: number; lng: number; distanceKm: number } | null = null;
-  const candidateStations: Array<{ name: string; lat: number; lng: number }> = [];
+  const allFound: Map<string, { lat: number; lng: number; distance: number }> = new Map();
 
-  // First pass: collect all candidate stations from keyword searches
   for (const keyword of keywords) {
     try {
       const res = await mapsClient.placesNearby({
         params: {
           location: { lat, lng },
-          radius: 50000, // 50km search radius
+          radius: 50000,
           keyword,
           language: Language.th,
           key,
         },
       });
 
+      // Check ALL results (up to 20) from Places API
       if (res.data.results && res.data.results.length > 0) {
         for (const result of res.data.results) {
           if (!result.geometry || !result.name) continue;
           
           const stationLat = result.geometry.location.lat;
           const stationLng = result.geometry.location.lng;
+          const distance = calculateDistance(lat, lng, stationLat, stationLng);
+          const key = `${result.name}:${stationLat}:${stationLng}`;
           
-          // Check if we already have this station (avoid duplicates)
-          if (!candidateStations.some(s => Math.abs(s.lat - stationLat) < 0.001 && Math.abs(s.lng - stationLng) < 0.001)) {
-            candidateStations.push({
-              name: result.name,
+          // Keep the closest occurrence of each station
+          if (!allFound.has(key) || allFound.get(key)!.distance > distance) {
+            allFound.set(key, {
               lat: stationLat,
               lng: stationLng,
+              distance,
             });
           }
         }
@@ -290,78 +324,41 @@ export async function getNearestTrainStationByKeyword(
     }
   }
 
-  if (candidateStations.length === 0) return null;
-
-  // Second pass: calculate actual walking distance for each candidate station
-  const origin = `${lat},${lng}`;
-  const destinations = candidateStations.map(s => `${s.lat},${s.lng}`);
+  // Find the absolute closest one
+  let minDistance = Infinity;
+  let closestKey = "";
   
-  try {
-    const res = await mapsClient.distancematrix({
-      params: {
-        origins: [origin],
-        destinations,
-        mode: TravelMode.walking,
-        language: Language.th,
-        key,
-      },
-    });
-
-    const allResults: Array<{ name: string; distance: number }> = [];
-
-    if (res.data.rows && res.data.rows[0] && res.data.rows[0].elements) {
-      const elements = res.data.rows[0].elements;
-      
-      for (let i = 0; i < candidateStations.length; i++) {
-        const station = candidateStations[i];
-        const element = elements[i];
-        
-        if (element.status === "OK" && element.distance) {
-          const distanceKm = element.distance.value / 1000;
-          allResults.push({ name: station.name, distance: distanceKm });
-          
-          // Track the closest station
-          if (!closestStation || distanceKm < closestStation.distanceKm) {
-            closestStation = {
-              name: station.name,
-              lat: station.lat,
-              lng: station.lng,
-              distanceKm,
-            };
-          }
-        }
-      }
+  for (const [key, data] of allFound.entries()) {
+    if (data.distance < minDistance) {
+      minDistance = data.distance;
+      closestKey = key;
     }
-
-    // Log all found stations sorted by walking distance
-    console.log(
-      `[getNearestTrainStationByKeyword] Search from (${lat}, ${lng}) using WALKING distance. Found:`,
-      allResults.sort((a, b) => a.distance - b.distance).slice(0, 5)
-    );
-  } catch (err) {
-    console.error("[getNearestTrainStationByKeyword] Distance Matrix error:", err);
-    // Fallback to straight-line distance if Distance Matrix API fails
-    const allResults: Array<{ name: string; distance: number }> = [];
-    
-    for (const station of candidateStations) {
-      const distance = calculateDistance(lat, lng, station.lat, station.lng);
-      allResults.push({ name: station.name, distance });
-      
-      if (!closestStation || distance < closestStation.distanceKm) {
-        closestStation = {
-          name: station.name,
-          lat: station.lat,
-          lng: station.lng,
-          distanceKm: distance,
-        };
-      }
-    }
-    
-    console.log(
-      `[getNearestTrainStationByKeyword] Using fallback straight-line distance:`,
-      allResults.sort((a, b) => a.distance - b.distance).slice(0, 5)
-    );
   }
+
+  if (closestKey) {
+    const [name] = closestKey.split(":");
+    const data = allFound.get(closestKey)!;
+    closestStation = {
+      name,
+      lat: data.lat,
+      lng: data.lng,
+      distanceKm: data.distance,
+    };
+  }
+
+  // Log results
+  const sortedResults = Array.from(allFound.entries())
+    .map(([key, data]) => {
+      const [name] = key.split(":");
+      return { name, distance: data.distance };
+    })
+    .sort((a, b) => a.distance - b.distance)
+    .slice(0, 5);
+
+  console.log(
+    `[getNearestTrainStationByKeyword] Search from (${lat}, ${lng}). Top 5 closest:`,
+    sortedResults
+  );
 
   return closestStation;
 }
