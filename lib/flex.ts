@@ -318,12 +318,13 @@ export function buildRouteDetailFlex(
     contents: bubble,
   };
 }
+
 export function buildTrainStationDetailFlex(
   stationName: string,
-  distanceKm: number,
-  walkingTimeMin: number
+  distanceKm: number
 ): FlexMessage {
   const primaryColor = "#2a9c64";
+  const walkingTimeMin = Math.ceil((distanceKm / 1.4) * 60); // Assume 1.4 km/hour walking speed
 
   const bubble: any = {
     type: "bubble",
@@ -334,7 +335,7 @@ export function buildTrainStationDetailFlex(
       contents: [
         {
           type: "text",
-          text: "🚆 สถานีรถไฟ/ขนส่ง",
+          text: "🚆 สถานีรถไฟใกล้ที่สุด",
           weight: "bold",
           size: "lg",
           color: "#ffffff",
@@ -391,7 +392,7 @@ export function buildTrainStationDetailFlex(
       contents: [
         {
           type: "text",
-          text: "พิมพ์ชื่อปลายทางเพื่อหาเส้นทางจากสถานีนี้",
+          text: "ระบบจะหาเส้นทางจากตำแหน่งปัจจุบันไปยังสถานีนี้",
           size: "xs",
           color: "#999999",
           wrap: true,

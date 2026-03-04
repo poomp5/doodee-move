@@ -11,7 +11,7 @@ const BOT_VERSION = "1.3.5";
 type WebhookEvent = any;
 import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
-import { getRoutes, getNearestTrainStation, getNearestTrainStationFromPlace, parseThaiDirectionText, parseTrainStationQuery, geocodePlace } from "@/lib/maps";
+import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword } from "@/lib/maps";
 import { calcCo2Saved, calcPoints } from "@/lib/carbon";
 import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex } from "@/lib/flex";
 
@@ -82,87 +82,6 @@ async function handleEvent(event: WebhookEvent) {
 
     const session = await getSession(lineUserId);
 
-    // --- Check for train station command ---
-    if (msg.type === "text") {
-      const text = (msg.text ?? "").trim();
-      
-      // Check for map pin request FIRST (exact match)
-      if (text === "สถานีรถไฟใกล้ฉัน") {
-        await setSession({
-          lineUserId,
-          step: "FINDING_NEAREST_TRAIN_STATION",
-        });
-        await safeReply(
-          replyToken,
-          [
-            {
-              type: "text",
-              text: "📍 ส่งตำแหน่งปัจจุบันของคุณมาเพื่อหาสถานีรถไฟใกล้ที่สุดครับ",
-            },
-          ],
-          "ไม่สามารถส่งข้อความตอบกลับได้"
-        );
-        return;
-      }
-
-      // Check for text-based train station query like "สถานีรถไฟใกล้เดอะมอล"
-      const trainStationQuery = parseTrainStationQuery(text);
-      if (trainStationQuery) {
-        try {
-          const trainStation = await getNearestTrainStationFromPlace(trainStationQuery.location);
-          if (!trainStation) {
-            await safeReply(
-              replyToken,
-              [{ type: "text", text: `ขอโทษครับ ไม่พบสถานีรถไฟใกล้กับ "${trainStationQuery.location}"` }],
-              "ไม่สามารถส่งข้อความตอบกลับได้"
-            );
-            return;
-          }
-
-          // Geocode station name to get precise coordinates for route finding
-          const stationCoords = await geocodePlace(trainStation.name);
-          const stationLat = stationCoords?.lat ?? undefined;
-          const stationLng = stationCoords?.lng ?? undefined;
-
-          if (stationLat && stationLng) {
-            // Set session with train station as origin and ask for destination
-            await setSession({
-              lineUserId,
-              step: "WAITING_DESTINATION_FROM_STATION",
-              originLat: stationLat,
-              originLng: stationLng,
-              destLabel: "",
-            });
-          }
-
-          // Show train station details in flex card
-          const stationFlex = buildTrainStationDetailFlex(
-            trainStation.name,
-            trainStation.distanceKm,
-            trainStation.walkingTimeMin
-          ) as any;
-
-          // Reply with station card and prompt for destination
-          await safeReply(
-            replyToken,
-            [
-              stationFlex,
-              {
-                type: "text",
-                text: `✅ พบสถานี!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางครับ`,
-              },
-            ],
-            "ไม่สามารถส่งข้อความตอบกลับได้"
-          );
-          return;
-        } catch (err) {
-          console.error("[webhook] text-based train station query failed", err);
-          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานี ลองใหม่อีกครั้ง" }]);
-          return;
-        }
-      }
-    }
-
     // --- Check for text-based direction (e.g., "ไปสยามจากเดอะมอล") ---
     if (msg.type === "text") {
       const text = (msg.text ?? "").trim();
@@ -228,71 +147,145 @@ async function handleEvent(event: WebhookEvent) {
           return;
         }
       }
-    }
 
-    // --- รับ Location สำหรับการหาสถานีรถไฟที่ใกล้ที่สุด ---
-    if (session?.step === "FINDING_NEAREST_TRAIN_STATION") {
-      if (msg.type === "location") {
-        const userLat = msg.latitude!;
-        const userLng = msg.longitude!;
+      // --- Check for train station request with place name (e.g., "สถานีรถไฟใกล้เดอะมอลบางแค") ---
+      if (text.includes("สถานีรถไฟใกล้")) {
+        // Extract place name if provided, otherwise ask for location
+        const placeMatch = text.match(/สถานีรถไฟใกล้(.+)/);
+        let searchOriginLat = session?.originLat;
+        let searchOriginLng = session?.originLng;
 
-        const trainStation = await getNearestTrainStation(userLat, userLng);
-        if (!trainStation) {
+        if (placeMatch && placeMatch[1].trim() && placeMatch[1].trim() !== "ฉัน") {
+          // Place name provided (e.g., "สถานีรถไฟใกล้เดอะมอล")
+          const placeName = placeMatch[1].trim();
+          try {
+            const placeGeocode = await geocodePlace(placeName);
+            if (!placeGeocode) {
+              await safeReply(
+                replyToken,
+                [{ type: "text", text: `ไม่พบสถานที่ "${placeName}" ลองพิมพ์ใหม่หรือส่ง location แทนครับ` }]
+              );
+              return;
+            }
+            searchOriginLat = placeGeocode.lat;
+            searchOriginLng = placeGeocode.lng;
+          } catch (err) {
+            console.error("[webhook] Train station place geocoding failed", err);
+            await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานที่ ลองใหม่อีกครั้ง" }]);
+            return;
+          }
+        } else if (!searchOriginLat || !searchOriginLng) {
+          // No place name and no saved origin - ask for location
+          await setSession({
+            lineUserId,
+            step: "WAITING_FOR_LOCATION_FOR_STATION",
+          });
           await safeReply(
             replyToken,
-            [{ type: "text", text: "ขอโทษครับ ไม่พบสถานีรถไฟใกล้กับตำแหน่งของคุณ" }],
-            "ไม่สามารถส่งข้อความตอบกลับได้"
+            [{ type: "text", text: "📍 โปรดส่งตำแหน่งปัจจุบันของคุณ เพื่อหาสถานีรถไฟใกล้ที่สุด" }]
           );
-          await clearSession(lineUserId);
           return;
         }
 
-        // Geocode station name to get precise coordinates
-        const stationCoords = await geocodePlace(trainStation.name);
-        const stationLat = stationCoords?.lat ?? userLat;
-        const stationLng = stationCoords?.lng ?? userLng;
+        // Find nearest train station
+        try {
+          const station = await getNearestTrainStationByKeyword(searchOriginLat!, searchOriginLng!);
+          if (!station) {
+            await safeReply(replyToken, [{ type: "text", text: "ขออทัศนีย์ครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
+            return;
+          }
 
-        // Set session with train station as origin and ask for destination
-        await setSession({
-          lineUserId,
-          step: "WAITING_DESTINATION_FROM_STATION",
-          originLat: stationLat,
-          originLng: stationLng,
-          destLabel: "",
-        });
+          // Immediately fetch routes from origin to station
+          const routes = await getRoutes(searchOriginLat!, searchOriginLng!, station.lat, station.lng);
+          if (routes.length === 0) {
+            await safeReply(replyToken, [
+              { type: "text", text: `พบสถานี ${station.name} ห่างออกไป ${station.distanceKm.toFixed(2)} กม.` },
+              { type: "text", text: "แต่ไม่พบเส้นทางขนส่งสาธารณะในพื้นที่นี้ ขออภัยครับ" }
+            ]);
+            return;
+          }
 
-        // Show train station details in flex card
-        const stationFlex = buildTrainStationDetailFlex(
-          trainStation.name,
-          trainStation.distanceKm,
-          trainStation.walkingTimeMin
-        ) as any;
+          // Save session and show routes
+          await setSession({
+            lineUserId,
+            step: "AWAITING_ROUTE",
+            originLat: searchOriginLat,
+            originLng: searchOriginLng,
+            destLat: station.lat,
+            destLng: station.lng,
+            destLabel: station.name,
+            pendingRoutes: routes,
+          });
 
-        // Reply with station card and prompt for destination
-        await safeReply(
-          replyToken,
-          [
-            stationFlex,
-            {
-              type: "text",
-              text: `✅ พบสถานี!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางครับ`,
-            },
-          ],
-          "ไม่สามารถส่งข้อความตอบกลับได้"
-        );
-        return;
-      } else {
-        await safeReply(
-          replyToken,
-          [{ type: "text", text: "กรุณาส่งตำแหน่งของคุณแทนครับ" }],
-          "ไม่สามารถส่งข้อความตอบกลับได้"
-        );
-        return;
+          const flexMsg = buildRoutesFlexMessage(routes, station.name) as any;
+          await safeReply(
+            replyToken,
+            [flexMsg],
+            "ระบบส่งการ์ดเส้นทางไม่สำเร็จ"
+          );
+          return;
+        } catch (err) {
+          console.error("[webhook] Train station lookup failed", err);
+          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานีรถไฟ ลองใหม่อีกครั้ง" }]);
+          return;
+        }
       }
     }
 
-    // --- รับ Location (origin) ---
+    // --- รับ Location (first check if waiting for station location) ---
     if (msg.type === "location") {
+      // Handle WAITING_FOR_LOCATION_FOR_STATION
+      if (session?.step === "WAITING_FOR_LOCATION_FOR_STATION") {
+        const originLat = msg.latitude!;
+        const originLng = msg.longitude!;
+
+        try {
+          const station = await getNearestTrainStationByKeyword(originLat, originLng);
+          if (!station) {
+            await safeReply(replyToken, [{ type: "text", text: "ขออทัศนีย์ครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
+            await clearSession(lineUserId);
+            return;
+          }
+
+          // Immediately fetch routes from location to station
+          const routes = await getRoutes(originLat, originLng, station.lat, station.lng);
+          if (routes.length === 0) {
+            await safeReply(replyToken, [
+              { type: "text", text: `พบสถานี ${station.name} ห่างออกไป ${station.distanceKm.toFixed(2)} กม.` },
+              { type: "text", text: "แต่ไม่พบเส้นทางขนส่งสาธารณะในพื้นที่นี้ ขออภัยครับ" }
+            ]);
+            await clearSession(lineUserId);
+            return;
+          }
+
+          // Save session and show routes
+          await setSession({
+            lineUserId,
+            step: "AWAITING_ROUTE",
+            originLat,
+            originLng,
+            destLat: station.lat,
+            destLng: station.lng,
+            destLabel: station.name,
+            pendingRoutes: routes,
+          });
+
+          const flexMsg = buildRoutesFlexMessage(routes, station.name) as any;
+          await safeReply(
+            replyToken,
+            [flexMsg],
+            "ระบบส่งการ์ดเส้นทางไม่สำเร็จ"
+          );
+          return;
+        } catch (err) {
+          console.error("[webhook] Train station location lookup failed", err);
+          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานีรถไฟ ลองใหม่อีกครั้ง" }]);
+          await clearSession(lineUserId);
+          return;
+        }
+      }
+
+      // Default location handling (setting origin)
       await setSession({
         lineUserId,
         step: "WAITING_DESTINATION",
@@ -312,10 +305,60 @@ async function handleEvent(event: WebhookEvent) {
       return;
     }
 
-    // --- รอปลายทาง (origin อาจเป็นสถานีรถไฟหรือตำแหน่งปกติ) ---
-    if (session?.step === "WAITING_DESTINATION" || session?.step === "WAITING_DESTINATION_FROM_STATION") {
+    // --- รอปลายทาง ---
+    if (session?.step === "WAITING_DESTINATION") {
       const originLat = session.originLat!;
       const originLng = session.originLng!;
+
+      // Check if user wants to find a train station from their origin
+      if (msg.type === "text") {
+        const text = (msg.text ?? "").trim();
+        if (text === "สถานีรถไฟใกล้ฉัน" || text.includes("สถานีรถไฟใกล้")) {
+          try {
+            const station = await getNearestTrainStationByKeyword(originLat, originLng);
+            if (!station) {
+              await safeReply(replyToken, [{ type: "text", text: "ขออทัศนีย์ครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
+              return;
+            }
+
+            // Immediately fetch routes from origin to station
+            const routes = await getRoutes(originLat, originLng, station.lat, station.lng);
+            if (routes.length === 0) {
+              await safeReply(replyToken, [
+                { type: "text", text: `พบสถานี ${station.name} ห่างออกไป ${station.distanceKm.toFixed(2)} กม.` },
+                { type: "text", text: "แต่ไม่พบเส้นทางขนส่งสาธารณะในพื้นที่นี้ ขออภัยครับ" }
+              ]);
+              return;
+            }
+
+            // Save session and show routes
+            await setSession({
+              lineUserId,
+              step: "AWAITING_ROUTE",
+              originLat,
+              originLng,
+              destLat: station.lat,
+              destLng: station.lng,
+              destLabel: station.name,
+              pendingRoutes: routes,
+            });
+
+            const flexMsg = buildRoutesFlexMessage(routes, station.name) as any;
+            await safeReply(
+              replyToken,
+              [flexMsg],
+              "ระบบส่งการ์ดเส้นทางไม่สำเร็จ"
+            );
+            return;
+          } catch (err) {
+            console.error("[webhook] Train station lookup from WAITING_DESTINATION failed", err);
+            await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานีรถไฟ ลองใหม่อีกครั้ง" }]);
+            return;
+          }
+        }
+      }
+
+      // Normal destination handling
       let destLat: number | undefined;
       let destLng: number | undefined;
       let destLabel = "ปลายทาง";
@@ -385,7 +428,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\n📍 วิธีค้นหาเส้นทาง:\n\n1️⃣ ส่งตำแหน่งปัจจุบันของคุณแล้วพิมพ์/ส่งปลายทาง\n\n2️⃣ หรือพิมพ์โดยตรง เช่น "เดอะมอลไปสยาม" หรือ "ไปสยามจากเดอะมอล"\n\n🚆 สถานีรถไฟ:\n- "สถานีรถไฟใกล้เดอะมอล" (ค้นหาแบบ Text)\n- หรือส่งตำแหน่งและพิมพ์ "สถานีรถไฟใกล้ฉัน" (ตำแหน่งปัจจุบัน)\n\n(Bot v${BOT_VERSION})`,
+      text: `สวัสดีครับ! 🌿 Doodee Move\n\n📍 วิธีค้นหาเส้นทาง:\n\n1️⃣ ส่งตำแหน่งปัจจุบันของคุณแล้วพิมพ์/ส่งปลายทาง\n\n2️⃣ หรือพิมพ์โดยตรง เช่น "เดอะมอลไปสยาม" หรือ "ไปสยามจากเดอะมอล"\n\n(Bot v${BOT_VERSION})`,
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
