@@ -242,29 +242,32 @@ export async function getNearestTrainStationByKeyword(
       const res = await mapsClient.placesNearby({
         params: {
           location: { lat, lng },
-          radius: 50000, // 50km search radius but we'll get the closest
+          radius: 50000, // 50km search radius
           keyword,
           language: Language.th,
           key,
         },
       });
 
+      // Check ALL results from this keyword, not just the first one
+      // Google sorts by relevance, not distance, so we need to find the closest
       if (res.data.results && res.data.results.length > 0) {
-        const result = res.data.results[0];
-        if (!result.geometry || !result.name) continue;
-        
-        const stationLat = result.geometry.location.lat;
-        const stationLng = result.geometry.location.lng;
-        const distance = calculateDistance(lat, lng, stationLat, stationLng);
+        for (const result of res.data.results) {
+          if (!result.geometry || !result.name) continue;
+          
+          const stationLat = result.geometry.location.lat;
+          const stationLng = result.geometry.location.lng;
+          const distance = calculateDistance(lat, lng, stationLat, stationLng);
 
-        // Keep track of the closest station across all keyword searches
-        if (!closestStation || distance < closestStation.distanceKm) {
-          closestStation = {
-            name: result.name,
-            lat: stationLat,
-            lng: stationLng,
-            distanceKm: distance,
-          };
+          // Keep track of the closest station across all results and keywords
+          if (!closestStation || distance < closestStation.distanceKm) {
+            closestStation = {
+              name: result.name,
+              lat: stationLat,
+              lng: stationLng,
+              distanceKm: distance,
+            };
+          }
         }
       }
     } catch (err) {
