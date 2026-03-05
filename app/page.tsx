@@ -1,5 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
+import AdminButton from "./components/AdminButton";
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#2E9C63] flex items-center justify-center relative overflow-hidden">
@@ -33,6 +35,8 @@ export default function Home() {
           </Link>
         </div>
       </div>
+
+      <AdminButton />
     </main>
   );
 }

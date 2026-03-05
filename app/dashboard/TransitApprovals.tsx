@@ -104,7 +104,7 @@ export default function TransitApprovals() {
       {/* Empty State */}
       {!loading && submissions.length === 0 && (
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">📭</div>
+          <MapPin className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <p className="text-slate-600 text-lg">No {filter !== "all" ? filter : ""} submissions found</p>
         </div>
       )}
