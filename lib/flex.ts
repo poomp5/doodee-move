@@ -7,7 +7,7 @@ type FlexCarousel = any;
 import { RouteResult } from "./maps";
 import { calcCo2Saved, calcPoints, MODE_LABEL } from "./carbon";
 
-function buildRouteBubble(route: RouteResult, index: number): FlexBubble {
+function buildRouteBubble(route: RouteResult): FlexBubble {
   const co2Saved = calcCo2Saved(route.distanceKm, route.mode);
   const label = MODE_LABEL[route.mode] ?? route.mode;
   const co2SavedKg = (co2Saved / 1000).toFixed(2);
@@ -205,7 +205,7 @@ function buildRouteBubble(route: RouteResult, index: number): FlexBubble {
           action: {
             type: "postback",
             label: `เลือก ${label}`,
-            data: `route=${index}`,
+            data: `route=${route.mode}`,
           },
           style: "primary",
           color: primaryColor,
@@ -223,7 +223,7 @@ export function buildRoutesFlexMessage(
 ): FlexMessage {
   // sort by estimated duration ascending so fastest options appear first
   const sorted = routes.slice().sort((a, b) => a.durationMin - b.durationMin);
-  const bubbles = sorted.slice(0, 5).map((r, i) => buildRouteBubble(r, i));
+  const bubbles = sorted.slice(0, 5).map((r) => buildRouteBubble(r));
 
   return {
     type: "flex",

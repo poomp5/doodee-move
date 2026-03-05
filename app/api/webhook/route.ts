@@ -691,7 +691,7 @@ async function handlePostback(event: WebhookEvent) {
   }
 
   if (data.startsWith("route=")) {
-    const idx = parseInt(data.slice("route=".length), 10);
+    const mode = data.slice("route=".length);
     const session = await getSession(lineUserId);
     // reject postbacks unless we're actively awaiting a route; this also
     // guards against a stale carousel clicking after the session has been
@@ -700,7 +700,7 @@ async function handlePostback(event: WebhookEvent) {
       return;
     }
     const routes: any[] = session.pendingRoutes as any[];
-    const chosen = routes[idx];
+    const chosen = routes.find((r: any) => r.mode === mode);
     if (!chosen) return;
 
     const co2Saved = calcCo2Saved(chosen.distanceKm, chosen.mode);
