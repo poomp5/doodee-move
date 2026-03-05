@@ -3,6 +3,7 @@ import { validateSignature, messagingApi } from "@line/bot-sdk";
 import { lineClient, lineBlobClient } from "@/lib/line";
 
 const BOT_VERSION = "1.4.3";
+const SHOW_BOT_VERSION = false; // Toggle to show/hide bot version in messages
 
 // The LINE SDK doesn't expose webhook event types through its public API,
 // and deep imports aren't resolving correctly during the Next build. We
@@ -173,7 +174,7 @@ async function handleEvent(event: WebhookEvent) {
 
           await safeReply(replyToken, [{
             type: "text",
-            text: `✅ รับรูปภาพแล้ว\n\nขั้นตอนที่ 2/3: ส่งตำแหน่งยานพาหนะ\n\nส่งตำแหน่งของจุดที่ยานพาหนะจอดอยู่ หรือที่คุณถ่ายรูป\n\nเคล็ดลับ: กด + ในช่องพิมพ์ข้อความ → เลือก Location → ส่ง\n\n(Bot v${BOT_VERSION})`,
+            text: `✅ รับรูปภาพแล้ว\n\nขั้นตอนที่ 2/3: ส่งตำแหน่งยานพาหนะ\n\nส่งตำแหน่งของจุดที่ยานพาหนะจอดอยู่ หรือที่คุณถ่ายรูป\n\nเคล็ดลับ: กด + ในช่องพิมพ์ข้อความ → เลือก Location → ส่ง${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
           }]);
         } catch (err) {
           console.error("[webhook] Image handling failed", err);
@@ -196,7 +197,7 @@ async function handleEvent(event: WebhookEvent) {
         await clearSession(lineUserId);
         await safeReply(replyToken, [{
           type: "text",
-          text: `✅ ยกเลิกและเริ่มใหม่แล้ว\n\nส่งตำแหน่งของคุณเพื่อเริ่มค้นหาเส้นทาง หรือกดเมนูด้านล่างเพื่อเลือกฟีเจอร์อื่นๆ\n\n(Bot v${BOT_VERSION})`,
+          text: `✅ ยกเลิกและเริ่มใหม่แล้ว\n\nส่งตำแหน่งของคุณเพื่อเริ่มค้นหาเส้นทาง หรือกดเมนูด้านล่างเพื่อเลือกฟีเจอร์อื่นๆ${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
         }]);
         return;
       }
@@ -205,7 +206,7 @@ async function handleEvent(event: WebhookEvent) {
       if (text === "วิธีการเดินทาง") {
         await safeReply(replyToken, [{
           type: "text",
-          text: `📍 วิธีการเดินทางใน Doodee Move\n\nขั้นตอนง่ายๆ:\n\n1. ส่งตำแหน่งปัจจุบันของคุณ\n2. พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทาง\n3. เลือกวิธีการเดินทาง (BTS, MRT, รถเมล์, เดิน, จักรยาน, E-Scooter, แท็กซี่)\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก" ได้ทุกเมื่อ\n\nทุกครั้งที่เดินทางด้วยขนส่งสาธารณะ ระบบจะบันทึก CO2 ที่ลดลงให้คุณ\n\n(Bot v${BOT_VERSION})`,
+          text: `📍 วิธีการเดินทางใน Doodee Move\n\nขั้นตอนง่ายๆ:\n\n1. ส่งตำแหน่งปัจจุบันของคุณ\n2. พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทาง\n3. เลือกวิธีการเดินทาง (BTS, MRT, รถเมล์, เดิน, จักรยาน, E-Scooter, แท็กซี่)\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก" ได้ทุกเมื่อ\n\nทุกครั้งที่เดินทางด้วยขนส่งสาธารณะ ระบบจะบันทึก CO2 ที่ลดลงให้คุณ${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
         }]);
         return;
       }
@@ -218,7 +219,7 @@ async function handleEvent(event: WebhookEvent) {
         });
         await safeReply(replyToken, [{
           type: "text",
-          text: `🚂 ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\nส่งตำแหน่งปัจจุบันของคุณมาได้เลย\n\nระบบจะหาสถานีรถไฟฟ้า (MRT, BTS) ที่ใกล้ที่สุด และแสดงวิธีเดินทางไปสถานีให้\n\n(Bot v${BOT_VERSION})`,
+          text: `🚂 ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\nส่งตำแหน่งปัจจุบันของคุณมาได้เลย\n\nระบบจะหาสถานีรถไฟฟ้า (MRT, BTS) ที่ใกล้ที่สุด และแสดงวิธีเดินทางไปสถานีให้${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
         }]);
         return;
       }
@@ -231,7 +232,7 @@ async function handleEvent(event: WebhookEvent) {
         });
         await safeReply(replyToken, [{
           type: "text",
-          text: `🗺️ สร้างแผนที่ขนส่งสาธารณะ\n\nขั้นตอนที่ 1/3: ถ่ายรูปยานพาหนะ\n\nถ่ายรูปยานพาหนะขนส่งสาธารณะ (รถสองแถว, รถเมล์, รถตู้) แล้วส่งมาให้เรา\n\nเคล็ดลับ: ถ่ายให้เห็นเลขหมายรถหรือป้ายหน้ารถชัดเจนนะ\n\n(Bot v${BOT_VERSION})`,
+          text: `🗺️ สร้างแผนที่ขนส่งสาธารณะ\n\nขั้นตอนที่ 1/3: ถ่ายรูปยานพาหนะ\n\nถ่ายรูปยานพาหนะขนส่งสาธารณะ (รถสองแถว, รถเมล์, รถตู้) แล้วส่งมาให้เรา\n\nเคล็ดลับ: ถ่ายให้เห็นเลขหมายรถหรือป้ายหน้ารถชัดเจนนะ${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
         }]);
         return;
       }
@@ -268,7 +269,7 @@ async function handleEvent(event: WebhookEvent) {
 
           await safeReply(replyToken, [{
             type: "text",
-            text: `✅ บันทึกข้อมูลเรียบร้อยแล้ว\n\nข้อมูลของคุณ:\n${description}\n\nข้อมูลจะถูกส่งไปยังผู้ดูแลระบบเพื่อตรวจสอบและอนุมัติ\n\nขอบคุณที่ช่วยสร้างแผนที่ขนส่งสาธารณะให้สมบูรณ์ขึ้น\n\n(Bot v${BOT_VERSION})`,
+            text: `✅ บันทึกข้อมูลเรียบร้อยแล้ว\n\nข้อมูลของคุณ:\n${description}\n\nข้อมูลจะถูกส่งไปยังผู้ดูแลระบบเพื่อตรวจสอบและอนุมัติ\n\nขอบคุณที่ช่วยสร้างแผนที่ขนส่งสาธารณะให้สมบูรณ์ขึ้น${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
           }]);
           await clearSession(lineUserId);
         } catch (err) {
@@ -470,7 +471,7 @@ async function handleEvent(event: WebhookEvent) {
 
         await safeReply(replyToken, [{
           type: "text",
-          text: `✅ รับตำแหน่งแล้ว\n\nขั้นตอนที่ 3/3: ระบุข้อมูลเส้นทาง\n\nพิมพ์ข้อมูลการเดินทาง เช่น:\n"หน้าโรงเรียนอัสสัมชัญธนบุรี มีรถสองแถวไปเดอะมอลบางแค ราคา 8 บาท"\n\nระบุให้ชัดเจน:\n- จุดต้นทาง\n- จุดปลายทาง\n- ราคา\n\n(Bot v${BOT_VERSION})`,
+          text: `✅ รับตำแหน่งแล้ว\n\nขั้นตอนที่ 3/3: ระบุข้อมูลเส้นทาง\n\nพิมพ์ข้อมูลการเดินทาง เช่น:\n"หน้าโรงเรียนอัสสัมชัญธนบุรี มีรถสองแถวไปเดอะมอลบางแค ราคา 8 บาท"\n\nระบุให้ชัดเจน:\n- จุดต้นทาง\n- จุดปลายทาง\n- ราคา${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
         }]);
         return;
       }
@@ -524,7 +525,7 @@ async function handleEvent(event: WebhookEvent) {
         [
           {
             type: "text",
-            text: `📍 รับตำแหน่งของคุณแล้ว\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทางได้เลย\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก"\n\n(Bot v${BOT_VERSION})`,
+            text: `📍 รับตำแหน่งของคุณแล้ว\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทางได้เลย\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก"${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
           },
         ]
       );
@@ -626,7 +627,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\nยินดีต้อนรับสู่แอปจัดการการเดินทาง\n\nกดเมนูด้านล่างเพื่อเลือกฟีเจอร์:\n\n🚌 วิธีการเดินทาง - คำแนะนำการใช้งาน\n🚇 สถานีรถไฟใกล้ฉัน - ค้นหาสถานีใกล้ๆ คุณ\n🗺️ สร้างแผนที่ - ช่วยเพิ่มข้อมูลขนส่งสาธารณะ\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก"\n\nทุกการเดินทางของคุณช่วยลด CO2 ให้โลก\n\n(Bot v${BOT_VERSION})`,
+      text: `สวัสดีครับ! 🌿 Doodee Move\n\nยินดีต้อนรับสู่แอปจัดการการเดินทาง\n\nกดเมนูด้านล่างเพื่อเลือกฟีเจอร์:\n\n🚌 วิธีการเดินทาง - คำแนะนำการใช้งาน\n🚇 สถานีรถไฟใกล้ฉัน - ค้นหาสถานีใกล้ๆ คุณ\n🗺️ สร้างแผนที่ - ช่วยเพิ่มข้อมูลขนส่งสาธารณะ\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก"\n\nทุกการเดินทางของคุณช่วยลด CO2 ให้โลก${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
