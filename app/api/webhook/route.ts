@@ -191,11 +191,21 @@ async function handleEvent(event: WebhookEvent) {
     if (msg.type === "text") {
       const text = (msg.text ?? "").trim();
 
+      // --- Check for "ยกเลิก" (Cancel) to restart ---
+      if (text === "ยกเลิก" || text === "cancel" || text === "เริ่มใหม่") {
+        await clearSession(lineUserId);
+        await safeReply(replyToken, [{
+          type: "text",
+          text: `✅ ยกเลิกและเริ่มใหม่แล้ว\n\nส่งตำแหน่งของคุณเพื่อเริ่มค้นหาเส้นทาง หรือกดเมนูด้านล่างเพื่อเลือกฟีเจอร์อื่นๆ\n\n(Bot v${BOT_VERSION})`,
+        }]);
+        return;
+      }
+
       // --- Check for "วิธีการเดินทาง" (How to Travel) request ---
       if (text === "วิธีการเดินทาง") {
         await safeReply(replyToken, [{
           type: "text",
-          text: `📍 วิธีการเดินทางใน Doodee Move\n\nขั้นตอนง่ายๆ:\n\n1. ส่งตำแหน่งปัจจุบันของคุณ\n2. พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทาง\n3. เลือกวิธีการเดินทาง (BTS, MRT, รถเมล์, เดิน, จักรยาน, E-Scooter, แท็กซี่)\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\nทุกครั้งที่เดินทางด้วยขนส่งสาธารณะ ระบบจะบันทึก CO2 ที่ลดลงให้คุณ\n\n(Bot v${BOT_VERSION})`,
+          text: `📍 วิธีการเดินทางใน Doodee Move\n\nขั้นตอนง่ายๆ:\n\n1. ส่งตำแหน่งปัจจุบันของคุณ\n2. พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทาง\n3. เลือกวิธีการเดินทาง (BTS, MRT, รถเมล์, เดิน, จักรยาน, E-Scooter, แท็กซี่)\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก" ได้ทุกเมื่อ\n\nทุกครั้งที่เดินทางด้วยขนส่งสาธารณะ ระบบจะบันทึก CO2 ที่ลดลงให้คุณ\n\n(Bot v${BOT_VERSION})`,
         }]);
         return;
       }
@@ -465,6 +475,43 @@ async function handleEvent(event: WebhookEvent) {
         return;
       }
 
+      // Handle WAITING_DESTINATION - user is sending destination location
+      if (session?.step === "WAITING_DESTINATION") {
+        const originLat = session.originLat!;
+        const originLng = session.originLng!;
+        const destLat = msg.latitude!;
+        const destLng = msg.longitude!;
+        const destLabel = msg.address ?? msg.title ?? "ปลายทาง";
+
+        // หาเส้นทาง
+        const routes = await getRoutes(originLat, originLng, destLat, destLng);
+        if (routes.length === 0) {
+          await clearSession(lineUserId);
+          await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบเส้นทางขนส่งสาธารณะหรือทางเลือกสีเขียวในพื้นที่นี้" }]);
+          return;
+        }
+
+        // store session state so we can record the trip when the user picks one
+        await setSession({
+          lineUserId,
+          step: "AWAITING_ROUTE",
+          originLat,
+          originLng,
+          destLat,
+          destLng,
+          destLabel,
+          pendingRoutes: routes,
+        });
+
+        // send the flex carousel with actions; user will choose explicitly
+        const flexMsg = buildRoutesFlexMessage(routes, destLabel) as any;
+        await safeReply(
+          replyToken,
+          [flexMsg]
+        );
+        return;
+      }
+
       // Default location handling (setting origin)
       await setSession({
         lineUserId,
@@ -477,92 +524,78 @@ async function handleEvent(event: WebhookEvent) {
         [
           {
             type: "text",
-            text: `📍 รับตำแหน่งของคุณแล้ว\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทางได้เลย\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\n(Bot v${BOT_VERSION})`,
+            text: `📍 รับตำแหน่งของคุณแล้ว\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทางได้เลย\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก"\n\n(Bot v${BOT_VERSION})`,
           },
         ]
       );
       return;
     }
 
-    // --- รอปลายทาง ---
-    if (session?.step === "WAITING_DESTINATION") {
+    // --- รอปลายทาง (text input only, location is handled above) ---
+    if (session?.step === "WAITING_DESTINATION" && msg.type === "text") {
       const originLat = session.originLat!;
       const originLng = session.originLng!;
+      const text = (msg.text ?? "").trim();
 
       // Check if user wants to find a train station from their origin
-      if (msg.type === "text") {
-        const text = (msg.text ?? "").trim();
-        if (text === "สถานีรถไฟใกล้ฉัน" || text.includes("สถานีรถไฟใกล้")) {
-          try {
-            const station = await getNearestTrainStationByKeyword(originLat, originLng);
-            if (!station) {
-              await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบสถานีรถไฟใกล้เคียง" }]);
-              return;
-            }
-
-            // Save session with station info and show confirmation card (NOT routes yet)
-            await setSession({
-              lineUserId,
-              step: "FOUND_TRAIN_STATION",
-              originLat,
-              originLng,
-              destLat: station.lat,
-              destLng: station.lng,
-              destLabel: station.name,
-            });
-
-            const flexMsg = buildTrainStationDetailFlex(station.name, station.distanceKm) as any;
-            await safeReply(
-              replyToken,
-              [flexMsg]
-            );
-            return;
-          } catch (err) {
-            console.error("[webhook] Train station lookup from WAITING_DESTINATION failed", err);
-            await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานีรถไฟ ลองใหม่อีกครั้ง" }]);
+      if (text === "สถานีรถไฟใกล้ฉัน" || text.includes("สถานีรถไฟใกล้")) {
+        try {
+          const station = await getNearestTrainStationByKeyword(originLat, originLng);
+          if (!station) {
+            await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบสถานีรถไฟใกล้เคียง" }]);
             return;
           }
+
+          // Save session with station info and show confirmation card (NOT routes yet)
+          await setSession({
+            lineUserId,
+            step: "FOUND_TRAIN_STATION",
+            originLat,
+            originLng,
+            destLat: station.lat,
+            destLng: station.lng,
+            destLabel: station.name,
+          });
+
+          const flexMsg = buildTrainStationDetailFlex(station.name, station.distanceKm) as any;
+          await safeReply(
+            replyToken,
+            [flexMsg]
+          );
+          return;
+        } catch (err) {
+          console.error("[webhook] Train station lookup from WAITING_DESTINATION failed", err);
+          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานีรถไฟ ลองใหม่อีกครั้ง" }]);
+          return;
         }
       }
 
-      // Normal destination handling
-      let destLat: number | undefined;
-      let destLng: number | undefined;
-      let destLabel = "ปลายทาง";
-
-      if (msg.type === "location") {
-        destLat = msg.latitude!;
-        destLng = msg.longitude!;
-        destLabel = msg.address ?? msg.title ?? "ปลายทาง";
-      } else if (msg.type === "text") {
-        const text = (msg.text ?? "").trim();
-        destLabel = text;
-        let geocoded;
-        try {
-          geocoded = await geocodePlace(text);
-        } catch (err) {
-          console.error("[webhook] geocodePlace failed", err);
-          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานที่ ลองใหม่อีกครั้งนะ" }]);
-          return;
-        }
-        if (!geocoded) {
-          await safeReply(
-            replyToken,
-            [{ type: "text", text: `ไม่พบสถานที่ "${text}" ลองพิมพ์ใหม่หรือส่งตำแหน่งปลายทางแทนนะ` }]
-          );
-          return;
-        }
-        destLat = geocoded.lat;
-        destLng = geocoded.lng;
-      } else {
+      // Normal text destination handling (geocode the place name)
+      const destLabel = text;
+      let geocoded;
+      try {
+        geocoded = await geocodePlace(text);
+      } catch (err) {
+        console.error("[webhook] geocodePlace failed", err);
+        await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานที่ ลองใหม่อีกครั้งนะ" }]);
+        return;
+      }
+      if (!geocoded) {
+        await safeReply(
+          replyToken,
+          [{ type: "text", text: `ไม่พบสถานที่ "${text}" ลองพิมพ์ใหม่หรือส่งตำแหน่งปลายทางแทนนะ` }]
+        );
         return;
       }
 
+      const destLat = geocoded.lat;
+      const destLng = geocoded.lng;
+
       // หาเส้นทาง
-      const routes = await getRoutes(originLat, originLng, destLat!, destLng!);
+      const routes = await getRoutes(originLat, originLng, destLat, destLng);
       if (routes.length === 0) {
         await clearSession(lineUserId);
-        await safeReply(replyToken, [{ type: "text", text: "ขอโทษครับ ไม่พบเส้นทางขนส่งสาธารณะหรือทางเลือกสีเขียวในพื้นที่นี้" }]);
+        await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบเส้นทางขนส่งสาธารณะหรือทางเลือกสีเขียวในพื้นที่นี้" }]);
         return;
       }
 
@@ -593,7 +626,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\nยินดีต้อนรับสู่แอปจัดการการเดินทาง\n\nกดเมนูด้านล่างเพื่อเลือกฟีเจอร์:\n\n🚌 วิธีการเดินทาง - คำแนะนำการใช้งาน\n🚇 สถานีรถไฟใกล้ฉัน - ค้นหาสถานีใกล้ๆ คุณ\n🗺️ สร้างแผนที่ - ช่วยเพิ่มข้อมูลขนส่งสาธารณะ\n\nทุกการเดินทางของคุณช่วยลด CO2 ให้โลก\n\n(Bot v${BOT_VERSION})`,
+      text: `สวัสดีครับ! 🌿 Doodee Move\n\nยินดีต้อนรับสู่แอปจัดการการเดินทาง\n\nกดเมนูด้านล่างเพื่อเลือกฟีเจอร์:\n\n🚌 วิธีการเดินทาง - คำแนะนำการใช้งาน\n🚇 สถานีรถไฟใกล้ฉัน - ค้นหาสถานีใกล้ๆ คุณ\n🗺️ สร้างแผนที่ - ช่วยเพิ่มข้อมูลขนส่งสาธารณะ\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก"\n\nทุกการเดินทางของคุณช่วยลด CO2 ให้โลก\n\n(Bot v${BOT_VERSION})`,
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
