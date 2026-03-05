@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     // Generate unique filename
     const timestamp = Date.now();
-    const filename = `transit-images/${lineUserId}/${timestamp}-${messageId}.jpg`;
+    const filename = `doodee/move/${lineUserId}/${timestamp}-${messageId}.jpg`;
 
     // Convert base64 to buffer
     const imageBuffer = Buffer.from(imageBase64, 'base64');
