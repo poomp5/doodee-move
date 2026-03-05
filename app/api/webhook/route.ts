@@ -95,6 +95,19 @@ async function handleEvent(event: WebhookEvent) {
         return;
       }
 
+      // --- Check for "สถานีรถไฟใกล้ฉัน" (Nearest Train Station) request ---
+      if (text === "สถานีรถไฟใกล้ฉัน") {
+        await setSession({
+          lineUserId,
+          step: "WAITING_FOR_LOCATION_FOR_STATION",
+        });
+        await safeReply(replyToken, [{
+          type: "text",
+          text: `🚂 ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\n📍 โปรดส่งตำแหน่งปัจจุบันของคุณครับ\n\nระบบจะทำการค้นหาสถานีรถไฟ/รถไฟฟ้า (MRT, BTS) ที่ใกล้ที่สุดกับตำแหน่งของคุณ แล้วแสดงเส้นทางการเดินทางไปยังสถานีนั้นครับ\n\n(Bot v${BOT_VERSION})`,
+        }]);
+        return;
+      }
+
       const parsed = parseThaiDirectionText(text);
       
       if (parsed) {
@@ -396,7 +409,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\n📍 วิธีค้นหาเส้นทาง:\n\n1️⃣ ส่งตำแหน่งปัจจุบันของคุณแล้วพิมพ์/ส่งปลายทาง\n\n2️⃣ หรือพิมพ์โดยตรง เช่น "เดอะมอลไปสยาม" หรือ "ไปสยามจากเดอะมอล"\n\n(Bot v${BOT_VERSION})`,
+      text: `สวัสดีครับ! 🌿 Doodee Move\n\n� ยินดีต้อนรับสู่แอปช่วยจัดการการเดินทาง\n\n💡 โปรดใช้ **Rich Menu** ด้านล่างเพื่อเลือกฟีเจอร์:\n\n1️⃣ **วิธีการเดินทาง** - สอนวิธีใช้งาน\n\n2️⃣ **สถานีรถไฟใกล้ฉัน** - ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\n🌿 ทุกการเดินทางของคุณช่วยลดการปล่อย CO2 ให้สิ่งแวดล้อม\n\n(Bot v${BOT_VERSION})`,
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
