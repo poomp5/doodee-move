@@ -85,6 +85,16 @@ async function handleEvent(event: WebhookEvent) {
     // --- Check for text-based direction (e.g., "ไปสยามจากเดอะมอล") ---
     if (msg.type === "text") {
       const text = (msg.text ?? "").trim();
+
+      // --- Check for "วิธีการเดินทาง" (How to Travel) request ---
+      if (text === "วิธีการเดินทาง") {
+        await safeReply(replyToken, [{
+          type: "text",
+          text: `📍 วิธีการเดินทางใน Doodee Move\n\n1️⃣ ส่ง location ปัจจุบันของคุณ\n\n2️⃣ พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทาง\n\n3️⃣ เลือกวิธีการเดินทางจากตัวเลือกต่างๆ (BTS, MRT, Bus, เดิน, จักรยาน, E-Scooter, รถแท็กซี่)\n\n💡 ทางลัด: คุณสามารถพิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลยครับ\n\n🌿 ทุกครั้งที่เดินทางด้วยขนส่งสาธารณะ บัญชีของคุณจะบันทึก CO2 ที่ลดลง\n\n(Bot v${BOT_VERSION})`,
+        }]);
+        return;
+      }
+
       const parsed = parseThaiDirectionText(text);
       
       if (parsed) {
