@@ -60,13 +60,36 @@ export async function getRoutes(
       const durationMin = Math.ceil(leg.duration.value / 60);
       let steps = leg.steps
         .filter((s) => s.html_instructions)
-        .map((s) =>
-          s.html_instructions
+        .map((s) => {
+          let instruction = s.html_instructions
             .replace(/<[^>]*>/g, "")
             // strip Google "plus codes" which are useless in directions
             .replace(/\b[A-Z0-9]{4}\+[A-Z0-9]{2,3}\b/g, "")
-            .trim()
-        );
+            .trim();
+          
+          // If this is a transit step, add bus/line number details
+          if (s.transit_details) {
+            const transit = s.transit_details;
+            const lineName = transit.line?.short_name || transit.line?.name;
+            const vehicleType = transit.line?.vehicle?.name || "รถประจำทาง";
+            const departureStop = transit.departure_stop?.name;
+            const arrivalStop = transit.arrival_stop?.name;
+            const numStops = transit.num_stops;
+            
+            // Build enhanced instruction with transit details
+            if (lineName) {
+              instruction = `${vehicleType} สาย ${lineName}`;
+              if (departureStop && arrivalStop) {
+                instruction += ` จาก ${departureStop} ไป ${arrivalStop}`;
+                if (numStops) {
+                  instruction += ` (${numStops} ป้าย)`;
+                }
+              }
+            }
+          }
+          
+          return instruction;
+        });
       const polyline = route.overview_polyline?.points;
 
       // ป้องกัน duplicate mode
