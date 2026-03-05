@@ -129,7 +129,7 @@ async function handleEvent(event: WebhookEvent) {
         if (!messageId) {
           await safeReply(replyToken, [{
             type: "text",
-            text: "ขออภัย ไม่สามารถรับรูปภาพได้ กรุณาลองใหม่อีกครั้ง",
+            text: "ขออภัย ไม่สามารถรับรูปภาพได้ ลองใหม่อีกครั้งนะ",
           }]);
           return;
         }
@@ -173,13 +173,13 @@ async function handleEvent(event: WebhookEvent) {
 
           await safeReply(replyToken, [{
             type: "text",
-            text: `✅ รับรูปภาพแล้ว!\n\nขั้นตอนที่ 2/3: ส่งตำแหน่งยานพาหนะ\n\n📍 โปรดส่ง location ของจุดที่ยานพาหนะจอดอยู่ หรือจุดที่คุณถ่ายรูปครับ\n\n💡 เคล็ดลับ: กด + ในช่องพิมพ์ข้อความ → เลือก Location → ส่ง\n\n(Bot v${BOT_VERSION})`,
+            text: `✅ รับรูปภาพแล้ว\n\nขั้นตอนที่ 2/3: ส่งตำแหน่งยานพาหนะ\n\nส่งตำแหน่งของจุดที่ยานพาหนะจอดอยู่ หรือที่คุณถ่ายรูป\n\nเคล็ดลับ: กด + ในช่องพิมพ์ข้อความ → เลือก Location → ส่ง\n\n(Bot v${BOT_VERSION})`,
           }]);
         } catch (err) {
           console.error("[webhook] Image handling failed", err);
           await safeReply(replyToken, [{
             type: "text",
-            text: "ขออภัย เกิดข้อผิดพลาดในการรับรูปภาพ กรุณาลองใหม่อีกครั้ง",
+            text: "ขออภัย เกิดข้อผิดพลาดในการรับรูปภาพ ลองใหม่อีกครั้งนะ",
           }]);
           await clearSession(lineUserId);
         }
@@ -195,7 +195,7 @@ async function handleEvent(event: WebhookEvent) {
       if (text === "วิธีการเดินทาง") {
         await safeReply(replyToken, [{
           type: "text",
-          text: `📍 วิธีการเดินทางใน Doodee Move\n\n1️⃣ ส่ง location ปัจจุบันของคุณ\n\n2️⃣ พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทาง\n\n3️⃣ เลือกวิธีการเดินทางจากตัวเลือกต่างๆ (BTS, MRT, Bus, เดิน, จักรยาน, E-Scooter, รถแท็กซี่)\n\n💡 ทางลัด: คุณสามารถพิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลยครับ\n\n🌿 ทุกครั้งที่เดินทางด้วยขนส่งสาธารณะ บัญชีของคุณจะบันทึก CO2 ที่ลดลง\n\n(Bot v${BOT_VERSION})`,
+          text: `📍 วิธีการเดินทางใน Doodee Move\n\nขั้นตอนง่ายๆ:\n\n1. ส่งตำแหน่งปัจจุบันของคุณ\n2. พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทาง\n3. เลือกวิธีการเดินทาง (BTS, MRT, รถเมล์, เดิน, จักรยาน, E-Scooter, แท็กซี่)\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\nทุกครั้งที่เดินทางด้วยขนส่งสาธารณะ ระบบจะบันทึก CO2 ที่ลดลงให้คุณ\n\n(Bot v${BOT_VERSION})`,
         }]);
         return;
       }
@@ -208,7 +208,7 @@ async function handleEvent(event: WebhookEvent) {
         });
         await safeReply(replyToken, [{
           type: "text",
-          text: `🚂 ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\n📍 โปรดส่งตำแหน่งปัจจุบันของคุณครับ\n\nระบบจะทำการค้นหาสถานีรถไฟ/รถไฟฟ้า (MRT, BTS) ที่ใกล้ที่สุดกับตำแหน่งของคุณ แล้วแสดงเส้นทางการเดินทางไปยังสถานีนั้นครับ\n\n(Bot v${BOT_VERSION})`,
+          text: `🚂 ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\nส่งตำแหน่งปัจจุบันของคุณมาได้เลย\n\nระบบจะหาสถานีรถไฟฟ้า (MRT, BTS) ที่ใกล้ที่สุด และแสดงวิธีเดินทางไปสถานีให้\n\n(Bot v${BOT_VERSION})`,
         }]);
         return;
       }
@@ -221,7 +221,7 @@ async function handleEvent(event: WebhookEvent) {
         });
         await safeReply(replyToken, [{
           type: "text",
-          text: `🗺️ สร้างแผนที่ขนส่งสาธารณะ\n\nขั้นตอนที่ 1/3: ถ่ายรูปยานพาหนะ\n\n📸 โปรดถ่ายรูปยานพาหนะขนส่งสาธารณะ (รถสองแถว, รถเมล์, รถตู้) และส่งรูปมาให้เราครับ\n\n💡 เคล็ดลับ: ถ่ายให้เห็นเลขหมายรถหรือป้ายหน้ารถชัดเจน\n\n(Bot v${BOT_VERSION})`,
+          text: `🗺️ สร้างแผนที่ขนส่งสาธารณะ\n\nขั้นตอนที่ 1/3: ถ่ายรูปยานพาหนะ\n\nถ่ายรูปยานพาหนะขนส่งสาธารณะ (รถสองแถว, รถเมล์, รถตู้) แล้วส่งมาให้เรา\n\nเคล็ดลับ: ถ่ายให้เห็นเลขหมายรถหรือป้ายหน้ารถชัดเจนนะ\n\n(Bot v${BOT_VERSION})`,
         }]);
         return;
       }
@@ -236,7 +236,7 @@ async function handleEvent(event: WebhookEvent) {
         if (!imageUrl || !latitude || !longitude) {
           await safeReply(replyToken, [{
             type: "text",
-            text: "ขออภัยครับ เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาเริ่มใหม่อีกครั้ง",
+            text: "ขออภัย เกิดข้อผิดพลาดในการบันทึกข้อมูล ลองเริ่มใหม่อีกครั้งนะ",
           }]);
           await clearSession(lineUserId);
           return;
@@ -258,14 +258,14 @@ async function handleEvent(event: WebhookEvent) {
 
           await safeReply(replyToken, [{
             type: "text",
-            text: `✅ บันทึกข้อมูลเรียบร้อยแล้ว!\n\n📋 ข้อมูลของคุณ:\n${description}\n\n🔍 ข้อมูลจะถูกส่งไปยังผู้ดูแลระบบเพื่อตรวจสอบและอนุมัติ\n\n🌿 ขอบคุณที่ช่วยสร้างแผนที่ขนส่งสาธารณะให้สมบูรณ์ขึ้น!\n\n(Bot v${BOT_VERSION})`,
+            text: `✅ บันทึกข้อมูลเรียบร้อยแล้ว\n\nข้อมูลของคุณ:\n${description}\n\nข้อมูลจะถูกส่งไปยังผู้ดูแลระบบเพื่อตรวจสอบและอนุมัติ\n\nขอบคุณที่ช่วยสร้างแผนที่ขนส่งสาธารณะให้สมบูรณ์ขึ้น\n\n(Bot v${BOT_VERSION})`,
           }]);
           await clearSession(lineUserId);
         } catch (err) {
           console.error("[webhook] Transit submission failed", err);
           await safeReply(replyToken, [{
             type: "text",
-            text: "ขออภัย เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง",
+            text: "ขออภัย เกิดข้อผิดพลาดในการบันทึกข้อมูล ลองใหม่อีกครั้งนะ",
           }]);
           await clearSession(lineUserId);
         }
@@ -285,7 +285,7 @@ async function handleEvent(event: WebhookEvent) {
           if (!originGeocode) {
             await safeReply(
               replyToken,
-              [{ type: "text", text: `ไม่พบสถานที่ต้นทาง "${originText}" ลองพิมพ์ใหม่หรือส่ง location ต้นทางแทนครับ` }]
+              [{ type: "text", text: `ไม่พบสถานที่ต้นทาง "${originText}" ลองพิมพ์ใหม่หรือส่งตำแหน่งต้นทางแทนนะ` }]
             );
             return;
           }
@@ -294,7 +294,7 @@ async function handleEvent(event: WebhookEvent) {
           if (!destGeocode) {
             await safeReply(
               replyToken,
-              [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่ง location ปลายทางแทนครับ` }]
+              [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่งตำแหน่งปลายทางแทนนะ` }]
             );
             return;
           }
@@ -302,7 +302,7 @@ async function handleEvent(event: WebhookEvent) {
           // หาเส้นทาง
           const routes = await getRoutes(originGeocode.lat, originGeocode.lng, destGeocode.lat, destGeocode.lng);
           if (routes.length === 0) {
-            await safeReply(replyToken, [{ type: "text", text: "ขอโทษครับ ไม่พบเส้นทางขนส่งสาธารณะหรือทางเลือกสีเขียวในพื้นที่นี้" }]);
+            await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบเส้นทางขนส่งสาธารณะหรือทางเลือกสีเขียวในพื้นที่นี้" }]);
             return;
           }
 
@@ -327,7 +327,7 @@ async function handleEvent(event: WebhookEvent) {
           return;
         } catch (err) {
           console.error("[webhook] text-based direction failed", err);
-          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาเส้นทาง ลองใหม่อีกครั้ง" }]);
+          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาเส้นทาง ลองใหม่อีกครั้งนะ" }]);
           return;
         }
       }
@@ -347,7 +347,7 @@ async function handleEvent(event: WebhookEvent) {
             if (!placeGeocode) {
               await safeReply(
                 replyToken,
-                [{ type: "text", text: `ไม่พบสถานที่ "${placeName}" ลองพิมพ์ใหม่หรือส่ง location แทนครับ` }]
+                [{ type: "text", text: `ไม่พบสถานที่ "${placeName}" ลองพิมพ์ใหม่หรือส่งตำแหน่งแทนนะ` }]
               );
               return;
             }
@@ -356,7 +356,7 @@ async function handleEvent(event: WebhookEvent) {
             console.log(`[webhook] Train station search for place "${placeName}" geocoded to (${searchOriginLat}, ${searchOriginLng})`);
           } catch (err) {
             console.error("[webhook] Train station place geocoding failed", err);
-            await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานที่ ลองใหม่อีกครั้ง" }]);
+            await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานที่ ลองใหม่อีกครั้งนะ" }]);
             return;
           }
         } else if (!searchOriginLat || !searchOriginLng) {
@@ -367,7 +367,7 @@ async function handleEvent(event: WebhookEvent) {
           });
           await safeReply(
             replyToken,
-            [{ type: "text", text: "📍 โปรดส่งตำแหน่งปัจจุบันของคุณ เพื่อหาสถานีรถไฟใกล้ที่สุด" }]
+            [{ type: "text", text: "📍 ส่งตำแหน่งปัจจุบันของคุณมา เพื่อหาสถานีรถไฟใกล้ที่สุด" }]
           );
           return;
         }
@@ -376,7 +376,7 @@ async function handleEvent(event: WebhookEvent) {
         try {
           const station = await getNearestTrainStationByKeyword(searchOriginLat!, searchOriginLng!);
           if (!station) {
-            await safeReply(replyToken, [{ type: "text", text: "ขออภัยครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
+            await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบสถานีรถไฟใกล้เคียง" }]);
             return;
           }
 
@@ -415,7 +415,7 @@ async function handleEvent(event: WebhookEvent) {
         try {
           const station = await getNearestTrainStationByKeyword(originLat, originLng);
           if (!station) {
-            await safeReply(replyToken, [{ type: "text", text: "ขอโทษครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
+            await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบสถานีรถไฟใกล้เคียง" }]);
             await clearSession(lineUserId);
             return;
           }
@@ -460,7 +460,7 @@ async function handleEvent(event: WebhookEvent) {
 
         await safeReply(replyToken, [{
           type: "text",
-          text: `✅ รับตำแหน่งแล้ว!\n\nขั้นตอนที่ 3/3: ระบุข้อมูลเส้นทาง\n\n📝 โปรดพิมพ์ข้อมูลการเดินทาง เช่น:\n"หน้าโรงเรียนอัสสัมชัญธนบุรี มีรถสองแถวไปเดอะมอลบางแค ราคา 8 บาท"\n\n💡 ระบุให้ชัดเจน:\n- จุดต้นทาง\n- จุดปลายทาง\n- ราคา\n\n(Bot v${BOT_VERSION})`,
+          text: `✅ รับตำแหน่งแล้ว\n\nขั้นตอนที่ 3/3: ระบุข้อมูลเส้นทาง\n\nพิมพ์ข้อมูลการเดินทาง เช่น:\n"หน้าโรงเรียนอัสสัมชัญธนบุรี มีรถสองแถวไปเดอะมอลบางแค ราคา 8 บาท"\n\nระบุให้ชัดเจน:\n- จุดต้นทาง\n- จุดปลายทาง\n- ราคา\n\n(Bot v${BOT_VERSION})`,
         }]);
         return;
       }
@@ -477,7 +477,7 @@ async function handleEvent(event: WebhookEvent) {
         [
           {
             type: "text",
-            text: `📍 รับตำแหน่งของคุณแล้ว!\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่ง location ปลายทางเลยครับ\n\n💡 เคล็ดลับ: คุณสามารถพิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลยครับ\n\n(Bot v${BOT_VERSION})`,
+            text: `📍 รับตำแหน่งของคุณแล้ว\n\nตอนนี้พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทางได้เลย\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\n(Bot v${BOT_VERSION})`,
           },
         ]
       );
@@ -496,7 +496,7 @@ async function handleEvent(event: WebhookEvent) {
           try {
             const station = await getNearestTrainStationByKeyword(originLat, originLng);
             if (!station) {
-              await safeReply(replyToken, [{ type: "text", text: "ขออภัยครับ ไม่พบสถานีรถไฟใกล้เคียง" }]);
+              await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบสถานีรถไฟใกล้เคียง" }]);
               return;
             }
 
@@ -542,13 +542,13 @@ async function handleEvent(event: WebhookEvent) {
           geocoded = await geocodePlace(text);
         } catch (err) {
           console.error("[webhook] geocodePlace failed", err);
-          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานที่ กรุณาลองใหม่อีกครั้ง" }]);
+          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาสถานที่ ลองใหม่อีกครั้งนะ" }]);
           return;
         }
         if (!geocoded) {
           await safeReply(
             replyToken,
-            [{ type: "text", text: `ไม่พบสถานที่ "${text}" ลองพิมพ์ใหม่หรือส่ง location ปลายทางแทนครับ` }]
+            [{ type: "text", text: `ไม่พบสถานที่ "${text}" ลองพิมพ์ใหม่หรือส่งตำแหน่งปลายทางแทนนะ` }]
           );
           return;
         }
@@ -593,7 +593,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\n👋 ยินดีต้อนรับสู่แอปจัดการการเดินทาง\n\n💡 โปรดใช้ **Rich Menu** ด้านล่างเพื่อเลือกฟีเจอร์:\n\n1️⃣ **วิธีการเดินทาง** - สอนวิธีใช้งาน\n\n2️⃣ **สถานีรถไฟใกล้ฉัน** - ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\n3️⃣ **สร้างแผนที่** - ช่วยเพิ่มข้อมูลขนส่งสาธารณะ\n\n🌿 ทุกการเดินทางของคุณช่วยลดการปล่อย CO2 ให้สิ่งแวดล้อม\n\n(Bot v${BOT_VERSION})`,
+      text: `สวัสดีครับ! 🌿 Doodee Move\n\nยินดีต้อนรับสู่แอปจัดการการเดินทาง\n\nกดเมนูด้านล่างเพื่อเลือกฟีเจอร์:\n\n🚌 วิธีการเดินทาง - คำแนะนำการใช้งาน\n🚇 สถานีรถไฟใกล้ฉัน - ค้นหาสถานีใกล้ๆ คุณ\n🗺️ สร้างแผนที่ - ช่วยเพิ่มข้อมูลขนส่งสาธารณะ\n\nทุกการเดินทางของคุณช่วยลด CO2 ให้โลก\n\n(Bot v${BOT_VERSION})`,
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -601,7 +601,7 @@ async function handleEvent(event: WebhookEvent) {
     console.error("[webhook] Event processing failed", { lineUserId, errMsg, errStack });
     await safeReply(replyToken, [{
       type: "text",
-      text: "ขออภัย ระบบมีปัญหาชั่วคราว ลองใหม่อีกครั้งในอีกสักครู่ครับ",
+      text: "ขออภัย ระบบมีปัญหาชั่วคราว ลองใหม่อีกสักครู่นะ",
     }]);
   }
 }
@@ -624,7 +624,7 @@ async function handlePostback(event: WebhookEvent) {
       await safeReply(replyToken, [
         {
           type: "text",
-          text: "ขอบคุณที่ยอมรับนโยบายความเป็นส่วนตัว\n\nคุณสามารถใช้งาน Doodee Move ได้แล้ว\n\nเริ่มต้นโดยส่งตำแหน่งปัจจุบันของคุณ หรือกดปุ่มเมนูด้านล่างเพื่อเข้าถึงฟีเจอร์ต่างๆ",
+          text: "ขอบคุณที่ยอมรับนโยบายความเป็นส่วนตัว\n\nคุณสามารถใช้งาน Doodee Move ได้แล้ว\n\nส่งตำแหน่งปัจจุบันของคุณ หรือกดปุ่มเมนูด้านล่างเพื่อเริ่มใช้งาน",
         },
       ]);
     } catch (error) {
@@ -632,7 +632,7 @@ async function handlePostback(event: WebhookEvent) {
       await safeReply(replyToken, [
         {
           type: "text",
-          text: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+          text: "เกิดข้อผิดพลาด ลองใหม่อีกครั้งนะ",
         },
       ]);
     }
