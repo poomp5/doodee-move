@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateSignature, messagingApi } from "@line/bot-sdk";
-import { lineClient } from "@/lib/line";
+import { lineClient, lineBlobClient } from "@/lib/line";
 
 const BOT_VERSION = "1.4.3";
 
@@ -59,7 +59,7 @@ async function handleEvent(event: WebhookEvent) {
   const lineUserId = event.source.userId;
   const replyToken = event.replyToken;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const msg = (event as any).message as { type: string; latitude?: number; longitude?: number; address?: string; title?: string; text?: string };
+  const msg = (event as any).message as { type: string; id?: string; latitude?: number; longitude?: number; address?: string; title?: string; text?: string };
 
   try {
     const prisma = getPrisma();
@@ -81,6 +81,71 @@ async function handleEvent(event: WebhookEvent) {
     // Removed: point system no longer supported
 
     const session = await getSession(lineUserId);
+
+    // --- Handle image messages (for map building) ---
+    if (msg.type === "image") {
+      if (session?.step === "MAP_BUILDING_WAITING_IMAGE") {
+        const messageId = msg.id;
+        if (!messageId) {
+          await safeReply(replyToken, [{
+            type: "text",
+            text: "ขออภัย ไม่สามารถรับรูปภาพได้ กรุณาลองใหม่อีกครั้ง",
+          }]);
+          return;
+        }
+
+        try {
+          // Get image content from LINE
+          const imageStream = await lineBlobClient.getMessageContent(messageId);
+          const chunks: Buffer[] = [];
+          
+          for await (const chunk of imageStream) {
+            chunks.push(Buffer.from(chunk));
+          }
+          
+          const imageBuffer = Buffer.concat(chunks);
+          
+          // Upload to R2 via API endpoint
+          const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/upload-image`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              imageBase64: imageBuffer.toString('base64'),
+              lineUserId,
+              messageId,
+            }),
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error('Image upload failed');
+          }
+
+          const { imageUrl } = await uploadResponse.json();
+
+          // Save image URL to session
+          await setSession({
+            lineUserId,
+            step: "MAP_BUILDING_WAITING_LOCATION",
+            transitImageUrl: imageUrl,
+          });
+
+          await safeReply(replyToken, [{
+            type: "text",
+            text: `✅ รับรูปภาพแล้ว!\n\nขั้นตอนที่ 2/3: ส่งตำแหน่งยานพาหนะ\n\n📍 โปรดส่ง location ของจุดที่ยานพาหนะจอดอยู่ หรือจุดที่คุณถ่ายรูปครับ\n\n💡 เคล็ดลับ: กด + ในช่องพิมพ์ข้อความ → เลือก Location → ส่ง\n\n(Bot v${BOT_VERSION})`,
+          }]);
+        } catch (err) {
+          console.error("[webhook] Image handling failed", err);
+          await safeReply(replyToken, [{
+            type: "text",
+            text: "ขออภัย เกิดข้อผิดพลาดในการรับรูปภาพ กรุณาลองใหม่อีกครั้ง",
+          }]);
+          await clearSession(lineUserId);
+        }
+        return;
+      }
+    }
 
     // --- Check for text-based direction (e.g., "ไปสยามจากเดอะมอล") ---
     if (msg.type === "text") {
@@ -105,6 +170,65 @@ async function handleEvent(event: WebhookEvent) {
           type: "text",
           text: `🚂 ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\n📍 โปรดส่งตำแหน่งปัจจุบันของคุณครับ\n\nระบบจะทำการค้นหาสถานีรถไฟ/รถไฟฟ้า (MRT, BTS) ที่ใกล้ที่สุดกับตำแหน่งของคุณ แล้วแสดงเส้นทางการเดินทางไปยังสถานีนั้นครับ\n\n(Bot v${BOT_VERSION})`,
         }]);
+        return;
+      }
+
+      // --- Check for "สร้างแผนที่" (Build Map) request ---
+      if (text === "สร้างแผนที่") {
+        await setSession({
+          lineUserId,
+          step: "MAP_BUILDING_WAITING_IMAGE",
+        });
+        await safeReply(replyToken, [{
+          type: "text",
+          text: `🗺️ สร้างแผนที่ขนส่งสาธารณะ\n\nขั้นตอนที่ 1/3: ถ่ายรูปยานพาหนะ\n\n📸 โปรดถ่ายรูปยานพาหนะขนส่งสาธารณะ (รถสองแถว, รถเมล์, รถตู้) และส่งรูปมาให้เราครับ\n\n💡 เคล็ดลับ: ถ่ายให้เห็นเลขหมายรถหรือป้ายหน้ารถชัดเจน\n\n(Bot v${BOT_VERSION})`,
+        }]);
+        return;
+      }
+
+      // --- Handle map building data input (step 3) ---
+      if (session?.step === "MAP_BUILDING_WAITING_DATA") {
+        const description = text;
+        const imageUrl = session.transitImageUrl;
+        const latitude = session.originLat;
+        const longitude = session.originLng;
+
+        if (!imageUrl || !latitude || !longitude) {
+          await safeReply(replyToken, [{
+            type: "text",
+            text: "ขออภัยครับ เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาเริ่มใหม่อีกครั้ง",
+          }]);
+          await clearSession(lineUserId);
+          return;
+        }
+
+        try {
+          // Save submission to database
+          await prisma.transitSubmission.create({
+            data: {
+              lineUserId,
+              displayName: user.displayName,
+              imageUrl,
+              latitude,
+              longitude,
+              description,
+              status: "pending",
+            },
+          });
+
+          await safeReply(replyToken, [{
+            type: "text",
+            text: `✅ บันทึกข้อมูลเรียบร้อยแล้ว!\n\n📋 ข้อมูลของคุณ:\n${description}\n\n🔍 ข้อมูลจะถูกส่งไปยังผู้ดูแลระบบเพื่อตรวจสอบและอนุมัติ\n\n🌿 ขอบคุณที่ช่วยสร้างแผนที่ขนส่งสาธารณะให้สมบูรณ์ขึ้น!\n\n(Bot v${BOT_VERSION})`,
+          }]);
+          await clearSession(lineUserId);
+        } catch (err) {
+          console.error("[webhook] Transit submission failed", err);
+          await safeReply(replyToken, [{
+            type: "text",
+            text: "ขออภัย เกิดข้อผิดพลาดในการบันทึกข้อมูล กรุณาลองใหม่อีกครั้ง",
+          }]);
+          await clearSession(lineUserId);
+        }
         return;
       }
 
@@ -281,6 +405,26 @@ async function handleEvent(event: WebhookEvent) {
         }
       }
 
+      // Handle MAP_BUILDING_WAITING_LOCATION
+      if (session?.step === "MAP_BUILDING_WAITING_LOCATION") {
+        const latitude = msg.latitude!;
+        const longitude = msg.longitude!;
+
+        await setSession({
+          lineUserId,
+          step: "MAP_BUILDING_WAITING_DATA",
+          originLat: latitude,
+          originLng: longitude,
+          transitImageUrl: session.transitImageUrl || undefined,
+        });
+
+        await safeReply(replyToken, [{
+          type: "text",
+          text: `✅ รับตำแหน่งแล้ว!\n\nขั้นตอนที่ 3/3: ระบุข้อมูลเส้นทาง\n\n📝 โปรดพิมพ์ข้อมูลการเดินทาง เช่น:\n"หน้าโรงเรียนอัสสัมชัญธนบุรี มีรถสองแถวไปเดอะมอลบางแค ราคา 8 บาท"\n\n💡 ระบุให้ชัดเจน:\n- จุดต้นทาง\n- จุดปลายทาง\n- ราคา\n\n(Bot v${BOT_VERSION})`,
+        }]);
+        return;
+      }
+
       // Default location handling (setting origin)
       await setSession({
         lineUserId,
@@ -409,7 +553,7 @@ async function handleEvent(event: WebhookEvent) {
     // Default message
     await safeReply(replyToken, [{
       type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\n� ยินดีต้อนรับสู่แอปช่วยจัดการการเดินทาง\n\n💡 โปรดใช้ **Rich Menu** ด้านล่างเพื่อเลือกฟีเจอร์:\n\n1️⃣ **วิธีการเดินทาง** - สอนวิธีใช้งาน\n\n2️⃣ **สถานีรถไฟใกล้ฉัน** - ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\n🌿 ทุกการเดินทางของคุณช่วยลดการปล่อย CO2 ให้สิ่งแวดล้อม\n\n(Bot v${BOT_VERSION})`,
+      text: `สวัสดีครับ! 🌿 Doodee Move\n\n👋 ยินดีต้อนรับสู่แอปจัดการการเดินทาง\n\n💡 โปรดใช้ **Rich Menu** ด้านล่างเพื่อเลือกฟีเจอร์:\n\n1️⃣ **วิธีการเดินทาง** - สอนวิธีใช้งาน\n\n2️⃣ **สถานีรถไฟใกล้ฉัน** - ค้นหาสถานีรถไฟที่ใกล้ที่สุด\n\n3️⃣ **สร้างแผนที่** - ช่วยเพิ่มข้อมูลขนส่งสาธารณะ\n\n🌿 ทุกการเดินทางของคุณช่วยลดการปล่อย CO2 ให้สิ่งแวดล้อม\n\n(Bot v${BOT_VERSION})`,
     }]);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
