@@ -13,7 +13,7 @@ import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
 import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword } from "@/lib/maps";
 import { calcCo2Saved, calcPoints } from "@/lib/carbon";
-import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex } from "@/lib/flex";
+import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex } from "@/lib/flex";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -48,6 +48,39 @@ export async function POST(req: NextRequest) {
 }
 
 async function handleEvent(event: WebhookEvent) {
+  // Handle follow event (when user adds bot)
+  if (event.type === "follow") {
+    const lineUserId = event.source.userId;
+    if (!lineUserId) return;
+
+    try {
+      const prisma = getPrisma();
+      
+      // Get user profile
+      let displayName = "ผู้ใช้";
+      try {
+        const profile = await lineClient.getProfile(lineUserId);
+        displayName = profile.displayName;
+      } catch {
+        // ignore profile read error
+      }
+
+      // Create user with consent = false
+      await prisma.user.upsert({
+        where: { lineUserId },
+        create: { lineUserId, displayName, pdpaConsent: false },
+        update: { displayName }, // Don't reset consent if they re-add
+      });
+
+      // Send PDPA consent message
+      const pdpaFlex = buildPDPAConsentFlex();
+      await safeReply(event.replyToken, [pdpaFlex]);
+    } catch (error) {
+      console.error("[webhook] Follow event error", error);
+    }
+    return;
+  }
+
   // postback events are used for the user choosing a route from the flex card
   if (event.type === "postback") {
     return handlePostback(event);
@@ -74,7 +107,14 @@ async function handleEvent(event: WebhookEvent) {
       } catch {
         // ignore profile read error
       }
-      user = await prisma.user.create({ data: { lineUserId, displayName } });
+      user = await prisma.user.create({ data: { lineUserId, displayName, pdpaConsent: false } });
+    }
+
+    // Check PDPA consent
+    if (!user.pdpaConsent) {
+      const pdpaFlex = buildPDPAConsentFlex();
+      await safeReply(replyToken, [pdpaFlex]);
+      return;
     }
 
     // --- Check for score command anytime ---
@@ -571,6 +611,33 @@ async function handlePostback(event: WebhookEvent) {
   const lineUserId = event.source.userId;
   const replyToken = event.replyToken;
   const data = event.postback?.data ?? "";
+
+  // Handle PDPA consent acceptance
+  if (data === "action=accept_pdpa") {
+    try {
+      const prisma = getPrisma();
+      await prisma.user.update({
+        where: { lineUserId },
+        data: { pdpaConsent: true },
+      });
+
+      await safeReply(replyToken, [
+        {
+          type: "text",
+          text: "ขอบคุณที่ยอมรับนโยบายความเป็นส่วนตัว\n\nคุณสามารถใช้งาน Doodee Move ได้แล้ว\n\nเริ่มต้นโดยส่งตำแหน่งปัจจุบันของคุณ หรือกดปุ่มเมนูด้านล่างเพื่อเข้าถึงฟีเจอร์ต่างๆ",
+        },
+      ]);
+    } catch (error) {
+      console.error("[webhook] PDPA consent update error", error);
+      await safeReply(replyToken, [
+        {
+          type: "text",
+          text: "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+        },
+      ]);
+    }
+    return;
+  }
 
   // Handle train station confirmation
   if (data === "action=confirm_station") {

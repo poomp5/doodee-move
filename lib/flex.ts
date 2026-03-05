@@ -411,3 +411,166 @@ export function buildTrainStationDetailFlex(
     contents: bubble,
   };
 }
+
+export function buildPDPAConsentFlex(): FlexMessage {
+  const primaryColor = "#2a9c64";
+  const dangerColor = "#dc3545";
+
+  const bubble: any = {
+    type: "bubble",
+    size: "mega",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "image",
+          url: "https://i.ibb.co/PZZybFhG/logo-2.png",
+          size: "sm",
+          aspectRatio: "1:1",
+          flex: 0,
+        },
+        {
+          type: "text",
+          text: "นโยบายความเป็นส่วนตัว",
+          weight: "bold",
+          size: "xl",
+          color: "#ffffff",
+          margin: "md",
+          wrap: true,
+        },
+      ],
+      backgroundColor: primaryColor,
+      paddingAll: "16px",
+      spacing: "sm",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        {
+          type: "text",
+          text: "ยินดีต้อนรับสู่ Doodee Move",
+          weight: "bold",
+          size: "lg",
+          color: "#333333",
+          wrap: true,
+        },
+        {
+          type: "separator",
+          margin: "md",
+        },
+        {
+          type: "text",
+          text: "เราจัดเก็บข้อมูลของคุณเพื่อ:",
+          size: "sm",
+          color: "#666666",
+          margin: "md",
+          wrap: true,
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          spacing: "xs",
+          margin: "sm",
+          contents: [
+            {
+              type: "text",
+              text: "- บันทึกเส้นทางการเดินทาง",
+              size: "xs",
+              color: "#666666",
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: "- คำนวณคาร์บอนที่ลดได้",
+              size: "xs",
+              color: "#666666",
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: "- แสดงสถิติการใช้งาน",
+              size: "xs",
+              color: "#666666",
+              wrap: true,
+            },
+            {
+              type: "text",
+              text: "- ปรับปรุงประสบการณ์การใช้บริการ",
+              size: "xs",
+              color: "#666666",
+              wrap: true,
+            },
+          ],
+        },
+        {
+          type: "separator",
+          margin: "md",
+        },
+        {
+          type: "text",
+          text: "ข้อมูลของคุณจะถูกเก็บรักษาอย่างปลอดภัยและไม่ถูกนำไปใช้เพื่อวัตถุประสงค์อื่นนอกเหนือจากที่ระบุ",
+          size: "xs",
+          color: "#999999",
+          margin: "md",
+          wrap: true,
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          contents: [
+            {
+              type: "text",
+              text: "กรุณายอมรับนโยบายเพื่อเริ่มใช้งาน",
+              size: "sm",
+              color: "#333333",
+              weight: "bold",
+              wrap: true,
+              align: "center",
+            },
+          ],
+          margin: "lg",
+          paddingAll: "8px",
+          backgroundColor: "#f0f8f5",
+          cornerRadius: "8px",
+        },
+      ],
+      paddingAll: "16px",
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "button",
+          style: "primary",
+          color: primaryColor,
+          action: {
+            type: "postback",
+            label: "ยอมรับและเริ่มใช้งาน",
+            data: "action=accept_pdpa",
+          },
+        },
+        {
+          type: "button",
+          style: "secondary",
+          action: {
+            type: "uri",
+            label: "อ่านนโยบายฉบับเต็ม",
+            uri: "https://doodee-move.vercel.app/privacy",
+          },
+        },
+      ],
+      paddingAll: "16px",
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: "กรุณายอมรับนโยบายความเป็นส่วนตัวเพื่อใช้งาน Doodee Move",
+    contents: bubble,
+  };
+}
