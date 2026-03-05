@@ -95,7 +95,6 @@ export default function PrivacyPage() {
               </p>
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="border border-green-200 rounded-lg p-4">
-                  <div className="text-green-600 text-2xl mb-2">📊</div>
                   <h3 className="font-semibold text-gray-900 mb-1">
                     บันทึกและวิเคราะห์
                   </h3>
@@ -105,7 +104,6 @@ export default function PrivacyPage() {
                 </div>
 
                 <div className="border border-green-200 rounded-lg p-4">
-                  <div className="text-green-600 text-2xl mb-2">🎯</div>
                   <h3 className="font-semibold text-gray-900 mb-1">
                     ปรับปรุงบริการ
                   </h3>
@@ -115,7 +113,6 @@ export default function PrivacyPage() {
                 </div>
 
                 <div className="border border-green-200 rounded-lg p-4">
-                  <div className="text-green-600 text-2xl mb-2">🗺️</div>
                   <h3 className="font-semibold text-gray-900 mb-1">
                     สร้างแผนที่
                   </h3>
@@ -125,7 +122,6 @@ export default function PrivacyPage() {
                 </div>
 
                 <div className="border border-green-200 rounded-lg p-4">
-                  <div className="text-green-600 text-2xl mb-2">📈</div>
                   <h3 className="font-semibold text-gray-900 mb-1">
                     แสดงสถิติ
                   </h3>
@@ -148,15 +144,15 @@ export default function PrivacyPage() {
                 </p>
                 <ul className="space-y-2 text-gray-700">
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-1">✓</span>
+                    <span className="text-green-600 mt-1 font-bold">•</span>
                     <span>เข้ารหัสข้อมูลระหว่างการส่งผ่าน (HTTPS/TLS)</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-1">✓</span>
+                    <span className="text-green-600 mt-1 font-bold">•</span>
                     <span>จัดเก็บข้อมูลในฐานข้อมูลที่ปลอดภัย</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-600 mt-1">✓</span>
+                    <span className="text-green-600 mt-1 font-bold">•</span>
                     <span>จำกัดการเข้าถึงข้อมูลเฉพาะผู้ที่จำเป็น</span>
                   </li>
                 </ul>
@@ -273,33 +269,6 @@ export default function PrivacyPage() {
                 การเปลี่ยนแปลงใดๆ จะมีผลทันทีเมื่อเรานำเผยแพร่นโยบายที่แก้ไขบนหน้านี้ 
                 เราขอแนะนำให้คุณตรวจสอบนโยบายเป็นประจำ
               </p>
-            </section>
-
-            {/* Contact */}
-            <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                ติดต่อเรา
-              </h2>
-              <p className="text-gray-700 mb-4">
-                หากคุณมีคำถามหรือข้อกังวลเกี่ยวกับนโยบายความเป็นส่วนตัวนี้หรือต้องการใช้สิทธิของคุณ 
-                กรุณาติดต่อเราผ่าน:
-              </p>
-              <div className="space-y-2 text-gray-700">
-                <div className="flex items-center gap-2">
-                  <span className="text-green-600">📧</span>
-                  <span className="font-medium">Email:</span>
-                  <a href="mailto:contact@doodee-future.com" className="text-green-600 hover:text-green-700">
-                    contact@doodee-future.com
-                  </a>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-green-600">🌐</span>
-                  <span className="font-medium">Website:</span>
-                  <a href="https://move.doodee-future.com" className="text-green-600 hover:text-green-700">
-                    move.doodee-future.com
-                  </a>
-                </div>
-              </div>
             </section>
 
             {/* Last Updated */}
