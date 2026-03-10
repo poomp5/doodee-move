@@ -64,3 +64,16 @@ model TransitSubmission {
   reviewedAt  DateTime?
   reviewedBy  String?
 }
+
+model UserRating {
+  id          String   @id @default(cuid())
+  lineUserId  String?  // Optional: can be anonymous
+  displayName String?  // Optional: store user name if available
+  rating      Int      // 1-5 stars
+  category    String   @default("usability") // usability, feature, overall, etc.
+  userAgent   String?  // Browser/device info
+  createdAt   DateTime @default(now())
+  
+  @@index([createdAt])
+  @@index([rating])
+}

@@ -574,3 +574,169 @@ export function buildPDPAConsentFlex(): FlexMessage {
     contents: bubble,
   };
 }
+
+export function buildRatingFlex(): FlexMessage {
+  const primaryColor = "#2a9c64";
+  const starColor = "#FBBF24";
+
+  const bubble: any = {
+    type: "bubble",
+    size: "mega",
+    header: {
+      type: "box",
+      layout: "vertical",
+      contents: [
+        {
+          type: "text",
+          text: "💭",
+          size: "xxl",
+          align: "center",
+        },
+        {
+          type: "text",
+          text: "ระบบใช้งานง่ายแค่ไหน?",
+          weight: "bold",
+          size: "xl",
+          color: "#ffffff",
+          align: "center",
+          wrap: true,
+          margin: "md",
+        },
+        {
+          type: "text",
+          text: "ให้คะแนนประสบการณ์การใช้งาน",
+          size: "sm",
+          color: "#ffffff",
+          align: "center",
+          wrap: true,
+          margin: "xs",
+        },
+      ],
+      backgroundColor: primaryColor,
+      paddingAll: "20px",
+      spacing: "sm",
+    },
+    body: {
+      type: "box",
+      layout: "vertical",
+      spacing: "md",
+      contents: [
+        {
+          type: "text",
+          text: "คลิกดาวเพื่อให้คะแนน",
+          size: "sm",
+          color: "#666666",
+          align: "center",
+          wrap: true,
+        },
+        {
+          type: "box",
+          layout: "horizontal",
+          spacing: "sm",
+          margin: "lg",
+          contents: [
+            {
+              type: "text",
+              text: "😞 ยาก",
+              size: "xs",
+              color: "#999999",
+              flex: 1,
+            },
+            {
+              type: "text",
+              text: "😊 ง่าย",
+              size: "xs",
+              color: "#999999",
+              flex: 1,
+              align: "end",
+            },
+          ],
+        },
+      ],
+      paddingAll: "20px",
+    },
+    footer: {
+      type: "box",
+      layout: "vertical",
+      spacing: "sm",
+      contents: [
+        {
+          type: "box",
+          layout: "horizontal",
+          spacing: "xs",
+          contents: [
+            {
+              type: "button",
+              action: {
+                type: "postback",
+                label: "⭐",
+                data: "action=rate&rating=1",
+              },
+              style: "secondary",
+              color: "#f5f5f5",
+              flex: 1,
+            },
+            {
+              type: "button",
+              action: {
+                type: "postback",
+                label: "⭐⭐",
+                data: "action=rate&rating=2",
+              },
+              style: "secondary",
+              color: "#f5f5f5",
+              flex: 1,
+            },
+            {
+              type: "button",
+              action: {
+                type: "postback",
+                label: "⭐⭐⭐",
+                data: "action=rate&rating=3",
+              },
+              style: "secondary",
+              color: "#f5f5f5",
+              flex: 1,
+            },
+          ],
+        },
+        {
+          type: "box",
+          layout: "horizontal",
+          spacing: "xs",
+          contents: [
+            {
+              type: "button",
+              action: {
+                type: "postback",
+                label: "⭐⭐⭐⭐",
+                data: "action=rate&rating=4",
+              },
+              style: "secondary",
+              color: "#f5f5f5",
+              flex: 1,
+            },
+            {
+              type: "button",
+              action: {
+                type: "postback",
+                label: "⭐⭐⭐⭐⭐",
+                data: "action=rate&rating=5",
+              },
+              style: "primary",
+              color: primaryColor,
+              flex: 1,
+            },
+          ],
+        },
+      ],
+      paddingAll: "16px",
+    },
+  };
+
+  return {
+    type: "flex",
+    altText: "ให้คะแนนความง่ายในการใช้งาน Doodee Move",
+    contents: bubble,
+  };
+}

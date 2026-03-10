@@ -14,7 +14,7 @@ import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
 import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword } from "@/lib/maps";
 import { calcCo2Saved, calcPoints } from "@/lib/carbon";
-import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex } from "@/lib/flex";
+import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex, buildRatingFlex } from "@/lib/flex";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -208,6 +208,13 @@ async function handleEvent(event: WebhookEvent) {
           type: "text",
           text: `📍 วิธีการเดินทางใน Doodee Move\n\nขั้นตอนง่ายๆ:\n\n1. ส่งตำแหน่งปัจจุบันของคุณ\n2. พิมพ์ชื่อปลายทาง หรือส่งตำแหน่งปลายทาง\n3. เลือกวิธีการเดินทาง (BTS, MRT, รถเมล์, เดิน, จักรยาน, E-Scooter, แท็กซี่)\n\nทางลัด: พิมพ์ "ต้นทางไปปลายทาง" เช่น "เดอะมอลไปสยาม" ได้เลย\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก" ได้ทุกเมื่อ\n\nทุกครั้งที่เดินทางด้วยขนส่งสาธารณะ ระบบจะบันทึก CO2 ที่ลดลงให้คุณ${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
         }]);
+        return;
+      }
+
+      // --- Check for "ให้คะแนน" (Rate Us) request ---
+      if (text === "ให้คะแนน" || text === "ให้คะแนนแอป" || text === "rate" || text === "rating") {
+        const ratingFlex = buildRatingFlex();
+        await safeReply(replyToken, [ratingFlex]);
         return;
       }
 
@@ -667,6 +674,66 @@ async function handlePostback(event: WebhookEvent) {
         {
           type: "text",
           text: "เกิดข้อผิดพลาด ลองใหม่อีกครั้งนะ",
+        },
+      ]);
+    }
+    return;
+  }
+
+  // Handle rating submission
+  if (data.startsWith("action=rate")) {
+    try {
+      // Parse rating from postback data: "action=rate&rating=5"
+      const params = new URLSearchParams(data);
+      const rating = parseInt(params.get("rating") || "0");
+
+      if (rating < 1 || rating > 5) {
+        return;
+      }
+
+      const prisma = getPrisma();
+      
+      // Get user info
+      let displayName = "ผู้ใช้";
+      try {
+        const profile = await lineClient.getProfile(lineUserId);
+        displayName = profile.displayName;
+      } catch {
+        // ignore profile read error
+      }
+
+      // Save rating to database
+      await prisma.userRating.create({
+        data: {
+          rating,
+          lineUserId,
+          displayName,
+          category: "usability",
+        },
+      });
+
+      // Thank you message with different responses based on rating
+      let responseText = "";
+      if (rating >= 4) {
+        responseText = `🎉 ขอบคุณมากสำหรับคะแนน ${rating} ดาว!\n\nดีใจที่คุณชอบ Doodee Move เราจะพัฒนาให้ดียิ่งขึ้นไปเรื่อยๆ`;
+      } else if (rating === 3) {
+        responseText = `🙏 ขอบคุณสำหรับคะแนน ${rating} ดาว\n\nเราจะพัฒนาปรับปรุงให้ดีขึ้นต่อไป`;
+      } else {
+        responseText = `🙏 ขอบคุณสำหรับคะแนน ${rating} ดาว\n\nเราจะนำความคิดเห็นของคุณไปปรับปรุงให้ดีขึ้น หากมีข้อเสนอแนะเพิ่มเติม สามารถแจ้งทีมงานได้นะคะ`;
+      }
+
+      await safeReply(replyToken, [
+        {
+          type: "text",
+          text: responseText,
+        },
+      ]);
+    } catch (error) {
+      console.error("[webhook] Rating submission error", error);
+      await safeReply(replyToken, [
+        {
+          type: "text",
+          text: "เกิดข้อผิดพลาดในการบันทึกคะแนน ลองใหม่อีกครั้งนะ",
         },
       ]);
     }
