@@ -6,11 +6,12 @@ A simple, non-intrusive one-click rating system that collects user feedback abou
 ## Features
 - ⭐ **One-click rating**: Users can rate with a single click (1-5 stars)
 - 💬 **LINE Bot Command**: Type "ให้คะแนน" anytime to rate
+- 🛡️ **Spam prevention**: Users can only rate once per 24 hours
 - 🎯 **Smart prompting**: Shows after 5 page visits on web, then waits 30 days before asking again
 - 💾 **Database storage**: All ratings are stored in PostgreSQL via Prisma
 - 📊 **Analytics**: View rating statistics and distribution
 - 🔕 **Dismissible**: Users can close the prompt (won't show again for 7 days)
-- 🎨 **Beautiful UI**: Smooth animations and hover effects for both web and LINE
+- 🎨 **Beautiful UI**: Vertical column layout for better mobile experience
 
 ## How It Works
 

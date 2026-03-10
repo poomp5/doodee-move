@@ -1,5 +1,9 @@
 # Quick Rating System Commands
 
+## Important Notes
+
+⚠️ **Rate Limiting**: Users can only rate once per 24 hours to prevent spam.
+
 ## For Testing
 
 ### LINE Bot Commands
@@ -32,6 +36,22 @@ SELECT rating, COUNT(*) as count
 FROM "UserRating" 
 GROUP BY rating 
 ORDER BY rating DESC;
+
+-- Check if user can rate (find recent ratings)
+SELECT 
+  "lineUserId", 
+  "rating", 
+  "createdAt",
+  NOW() - "createdAt" as "time_since_rating"
+FROM "UserRating" 
+WHERE "lineUserId" = 'USER_ID_HERE'
+ORDER BY "createdAt" DESC 
+LIMIT 1;
+
+-- Delete a user's recent rating (for testing)
+DELETE FROM "UserRating" 
+WHERE "lineUserId" = 'USER_ID_HERE' 
+AND "createdAt" >= NOW() - INTERVAL '24 hours';
 ```
 
 ### API Endpoint

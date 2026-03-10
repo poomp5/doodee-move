@@ -693,6 +693,33 @@ async function handlePostback(event: WebhookEvent) {
 
       const prisma = getPrisma();
       
+      // Check if user has already rated in the last 24 hours
+      const oneDayAgo = new Date();
+      oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+      
+      const recentRating = await prisma.userRating.findFirst({
+        where: {
+          lineUserId,
+          createdAt: {
+            gte: oneDayAgo,
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      if (recentRating) {
+        // User has already rated recently
+        await safeReply(replyToken, [
+          {
+            type: "text",
+            text: `ขอบคุณที่ให้คะแนน! 🙏\n\nคุณได้ให้คะแนนไปแล้วเมื่อ ${recentRating.createdAt.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\nสามารถให้คะแนนใหม่ได้อีกครั้งในอีก 24 ชั่วโมง`,
+          },
+        ]);
+        return;
+      }
+      
       // Get user info
       let displayName = "ผู้ใช้";
       try {
