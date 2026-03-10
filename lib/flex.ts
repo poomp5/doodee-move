@@ -577,7 +577,6 @@ export function buildPDPAConsentFlex(): FlexMessage {
 
 export function buildRatingFlex(): FlexMessage {
   const primaryColor = "#2a9c64";
-  const starColor = "#FBBF24";
 
   const bubble: any = {
     type: "bubble",
@@ -658,7 +657,7 @@ export function buildRatingFlex(): FlexMessage {
     footer: {
       type: "box",
       layout: "vertical",
-      spacing: "sm",
+      spacing: "md",
       contents: [
         {
           type: "box",
@@ -674,28 +673,55 @@ export function buildRatingFlex(): FlexMessage {
               },
               style: "secondary",
               color: "#f5f5f5",
+              height: "sm",
               flex: 1,
             },
             {
               type: "button",
               action: {
                 type: "postback",
-                label: "⭐⭐",
+                label: "⭐",
                 data: "action=rate&rating=2",
               },
               style: "secondary",
               color: "#f5f5f5",
+              height: "sm",
               flex: 1,
             },
             {
               type: "button",
               action: {
                 type: "postback",
-                label: "⭐⭐⭐",
+                label: "⭐",
                 data: "action=rate&rating=3",
               },
               style: "secondary",
               color: "#f5f5f5",
+              height: "sm",
+              flex: 1,
+            },
+            {
+              type: "button",
+              action: {
+                type: "postback",
+                label: "⭐",
+                data: "action=rate&rating=4",
+              },
+              style: "secondary",
+              color: "#f5f5f5",
+              height: "sm",
+              flex: 1,
+            },
+            {
+              type: "button",
+              action: {
+                type: "postback",
+                label: "⭐",
+                data: "action=rate&rating=5",
+              },
+              style: "primary",
+              color: primaryColor,
+              height: "sm",
               flex: 1,
             },
           ],
@@ -706,25 +732,43 @@ export function buildRatingFlex(): FlexMessage {
           spacing: "xs",
           contents: [
             {
-              type: "button",
-              action: {
-                type: "postback",
-                label: "⭐⭐⭐⭐",
-                data: "action=rate&rating=4",
-              },
-              style: "secondary",
-              color: "#f5f5f5",
+              type: "text",
+              text: "1",
+              size: "xxs",
+              color: "#999999",
+              align: "center",
               flex: 1,
             },
             {
-              type: "button",
-              action: {
-                type: "postback",
-                label: "⭐⭐⭐⭐⭐",
-                data: "action=rate&rating=5",
-              },
-              style: "primary",
-              color: primaryColor,
+              type: "text",
+              text: "2",
+              size: "xxs",
+              color: "#999999",
+              align: "center",
+              flex: 1,
+            },
+            {
+              type: "text",
+              text: "3",
+              size: "xxs",
+              color: "#999999",
+              align: "center",
+              flex: 1,
+            },
+            {
+              type: "text",
+              text: "4",
+              size: "xxs",
+              color: "#999999",
+              align: "center",
+              flex: 1,
+            },
+            {
+              type: "text",
+              text: "5",
+              size: "xxs",
+              color: "#999999",
+              align: "center",
               flex: 1,
             },
           ],
