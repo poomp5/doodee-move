@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, Check, X, Maximize2, ExternalLink } from "lucide-react";
 import type { TransitSubmission } from "@/app/generated/prisma/client";
 
@@ -31,18 +31,21 @@ export function SubmissionsClient({
   initialStatus: string;
 }) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [submissions, setSubmissions] = useState(initialSubmissions);
   const [activeTab, setActiveTab] = useState(initialStatus);
-  const [loading, setLoading] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [zoomImg, setZoomImg] = useState<string | null>(null);
 
   function handleTabChange(val: string) {
     setActiveTab(val);
-    router.push(`/admin/submissions?status=${val}`);
+    startTransition(() => {
+      router.push(`/admin/submissions?status=${val}`);
+    });
   }
 
   async function handleAction(id: string, action: "approve" | "reject") {
-    setLoading(id + action);
+    setActionLoading(id + action);
     const res = await fetch("/api/admin/submissions", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -55,7 +58,7 @@ export function SubmissionsClient({
         )
       );
     }
-    setLoading(null);
+    setActionLoading(null);
   }
 
   const filtered =
@@ -88,7 +91,23 @@ export function SubmissionsClient({
         </TabsList>
       </Tabs>
 
-      {filtered.length === 0 ? (
+      {isPending ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+              <Skeleton className="w-full h-48" />
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                  <Skeleton className="h-4 w-28" />
+                </div>
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="text-center py-24 text-gray-400 text-sm">No submissions found</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
@@ -140,21 +159,21 @@ export function SubmissionsClient({
                     <Button
                       size="sm"
                       className="flex-1 bg-[#2E9C63] hover:bg-[#268a56] text-white h-9"
-                      disabled={loading !== null}
+                      disabled={actionLoading !== null}
                       onClick={() => handleAction(s.id, "approve")}
                     >
                       <Check className="w-3.5 h-3.5 mr-1" />
-                      {loading === s.id + "approve" ? "..." : "Approve"}
+                      {actionLoading === s.id + "approve" ? "..." : "Approve"}
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       className="flex-1 text-red-500 border-red-200 hover:bg-red-50 h-9"
-                      disabled={loading !== null}
+                      disabled={actionLoading !== null}
                       onClick={() => handleAction(s.id, "reject")}
                     >
                       <X className="w-3.5 h-3.5 mr-1" />
-                      {loading === s.id + "reject" ? "..." : "Reject"}
+                      {actionLoading === s.id + "reject" ? "..." : "Reject"}
                     </Button>
                   </div>
                 )}
