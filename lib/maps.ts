@@ -40,7 +40,7 @@ export async function getRoutes(
   const key = process.env.GOOGLE_MAPS_API_KEY!;
   const results: RouteResult[] = [];
 
-  // Transit routes (BTS/MRT/Bus) — Google Directions
+  // Transit routes (BTS/MRT/Bus) - Google Directions
   for (const { travelMode, transitMode, key: modeKey } of TRANSIT_MODES) {
     try {
       const res = await mapsClient.directions({

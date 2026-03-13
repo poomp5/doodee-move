@@ -227,7 +227,7 @@ export function buildRoutesFlexMessage(
 
   return {
     type: "flex",
-    altText: `เส้นทางไป${destLabel} — ${routes.length} ตัวเลือก`,
+    altText: `เส้นทางไป${destLabel} - ${routes.length} ตัวเลือก`,
     contents: {
       type: "carousel",
       contents: bubbles,

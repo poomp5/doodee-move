@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Noto_Sans_Thai, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import RatingPrompt from "./components/RatingPrompt";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const notoSansThai = Noto_Sans_Thai({
+  variable: "--font-sans",
+  subsets: ["thai", "latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -79,7 +81,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${notoSansThai.variable} antialiased`}
       >
         {children}
         <RatingPrompt />

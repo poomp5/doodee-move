@@ -148,6 +148,7 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    font-family:"Noto Sans Thai",sans-serif;
   }
   body {
     @apply bg-background text-foreground;
