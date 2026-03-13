@@ -63,6 +63,8 @@ model TransitSubmission {
   createdAt   DateTime @default(now())
   reviewedAt  DateTime?
   reviewedBy  String?
+
+  @@index([status, createdAt(sort: Desc)])
 }
 
 model UserRating {
@@ -74,6 +76,6 @@ model UserRating {
   userAgent   String?  // Browser/device info
   createdAt   DateTime @default(now())
   
+  @@index([category, rating])
   @@index([createdAt])
-  @@index([rating])
 }

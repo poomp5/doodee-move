@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 
+async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === retries) throw err;
+      await new Promise((r) => setTimeout(r, 300 * (i + 1)));
+    }
+  }
+  throw new Error("unreachable");
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -15,12 +27,9 @@ export async function POST(req: NextRequest) {
     }
 
     const prisma = getPrisma();
-    
-    // Get user agent for analytics
     const userAgent = req.headers.get("user-agent") || undefined;
 
-    // Save rating to database
-    const userRating = await prisma.userRating.create({
+    const userRating = await withRetry(() => prisma.userRating.create({
       data: {
         rating: parseInt(rating),
         lineUserId: lineUserId || null,
@@ -28,7 +37,7 @@ export async function POST(req: NextRequest) {
         category,
         userAgent,
       },
-    });
+    }));
 
     return NextResponse.json({
       success: true,
@@ -44,36 +53,37 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Optional: GET endpoint to retrieve rating statistics
 export async function GET(req: NextRequest) {
   try {
     const prisma = getPrisma();
-    
-    // Get rating statistics
-    const ratings = await prisma.userRating.findMany({
-      where: { category: "usability" },
-      select: { rating: true },
-    });
 
-    const totalRatings = ratings.length;
-    const averageRating = totalRatings > 0
-      ? ratings.reduce((sum, r) => sum + r.rating, 0) / totalRatings
-      : 0;
+    const [agg, groups] = await withRetry(() =>
+      Promise.all([
+        prisma.userRating.aggregate({
+          where: { category: "usability" },
+          _avg: { rating: true },
+          _count: { rating: true },
+        }),
+        prisma.userRating.groupBy({
+          by: ["rating"],
+          where: { category: "usability" },
+          _count: { rating: true },
+        }),
+      ])
+    );
 
-    // Count by star rating
-    const distribution = {
-      1: ratings.filter(r => r.rating === 1).length,
-      2: ratings.filter(r => r.rating === 2).length,
-      3: ratings.filter(r => r.rating === 3).length,
-      4: ratings.filter(r => r.rating === 4).length,
-      5: ratings.filter(r => r.rating === 5).length,
-    };
+    const totalRatings = agg._count.rating;
+    const averageRating = Math.round((agg._avg.rating ?? 0) * 10) / 10;
 
-    return NextResponse.json({
-      totalRatings,
-      averageRating: Math.round(averageRating * 10) / 10,
-      distribution,
-    });
+    const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const g of groups) {
+      distribution[g.rating] = g._count.rating;
+    }
+
+    return NextResponse.json(
+      { totalRatings, averageRating, distribution },
+      { headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30" } }
+    );
   } catch (error) {
     console.error("Error fetching ratings:", error);
     return NextResponse.json(

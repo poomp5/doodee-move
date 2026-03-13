@@ -16,7 +16,10 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json({ submissions });
+    return NextResponse.json(
+      { submissions },
+      { headers: { "Cache-Control": "public, s-maxage=5, stale-while-revalidate=15" } }
+    );
   } catch (error) {
     console.error("[admin/submissions] GET failed", error);
     return NextResponse.json(
