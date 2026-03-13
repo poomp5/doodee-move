@@ -36,7 +36,7 @@ echo ""
 
 # ─── ตรวจสอบ server ────────────────────────────────────────
 echo "🔍 ตรวจสอบ server ที่ $BASE_URL ..."
-if curl -sf "$BASE_URL/api/rating" > /dev/null 2>&1; then
+if curl -sf "$BASE_URL/api/webhook" > /dev/null 2>&1; then
   echo "✅ Server พร้อม"
 else
   echo "⚠️  Server อาจยังไม่พร้อม — ดำเนินการต่อ..."
