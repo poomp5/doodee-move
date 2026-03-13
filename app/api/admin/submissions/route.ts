@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 
+async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (i === retries) throw err;
+      await new Promise((r) => setTimeout(r, 300 * (i + 1)));
+    }
+  }
+  throw new Error("unreachable");
+}
+
 // GET: Fetch submissions
 export async function GET(req: NextRequest) {
   try {
@@ -11,10 +23,12 @@ export async function GET(req: NextRequest) {
 
     const where = status && status !== "all" ? { status } : {};
 
-    const submissions = await prisma.transitSubmission.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
+    const submissions = await withRetry(() =>
+      prisma.transitSubmission.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+      })
+    );
 
     return NextResponse.json(
       { submissions },
