@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://move.doodee-future.com"),
+  metadataBase: new URL("https://dmove.site"),
 
   title: {
     default: "Doodee Move | เดินทางอัจฉริยะ ลดคาร์บอน",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     title: "Doodee Move | เดินทางอัจฉริยะ ลดคาร์บอน",
     description:
       "เลือกเส้นทางที่ดีที่สุด ลด CO₂ และร่วมสร้างเมืองที่ยั่งยืน",
-    url: "https://move.doodee-future.com",
+    url: "https://dmove.site",
     siteName: "Doodee Move",
     images: [
       {

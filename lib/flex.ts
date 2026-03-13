@@ -560,7 +560,7 @@ export function buildPDPAConsentFlex(): FlexMessage {
           action: {
             type: "uri",
             label: "อ่านนโยบายฉบับเต็ม",
-            uri: "https://move.doodee-future.com/privacy",
+            uri: "https://dmove.site/privacy",
           },
         },
       ],

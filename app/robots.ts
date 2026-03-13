@@ -9,7 +9,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/admin/", "/_next/"],
       },
     ],
-    sitemap: "https://move.doodee-future.com/sitemap.xml",
-    host: "https://move.doodee-future.com",
+    sitemap: "https://dmove.site/sitemap.xml",
+    host: "https://dmove.site",
   };
 }
