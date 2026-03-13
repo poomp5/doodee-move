@@ -5,13 +5,28 @@ import { SubmissionsClient } from "./SubmissionsClient";
 
 export const dynamic = "force-dynamic";
 
-async function getSubmissions(status?: string) {
+async function getData(status: string) {
   const prisma = getPrisma();
-  const where = status && status !== "all" ? { status } : {};
-  return prisma.transitSubmission.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-  });
+  const [submissions, counts] = await Promise.all([
+    prisma.transitSubmission.findMany({
+      where: status !== "all" ? { status } : {},
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.transitSubmission.groupBy({
+      by: ["status"],
+      _count: true,
+    }),
+  ]);
+
+  const statusCounts: Record<string, number> = { pending: 0, approved: 0, rejected: 0 };
+  let total = 0;
+  for (const g of counts) {
+    statusCounts[g.status] = g._count;
+    total += g._count;
+  }
+  statusCounts.all = total;
+
+  return { submissions, statusCounts };
 }
 
 function SubmissionsSkeleton() {
@@ -44,7 +59,7 @@ export default async function SubmissionsPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { status = "pending" } = await searchParams;
-  const submissions = await getSubmissions(status);
+  const { submissions, statusCounts } = await getData(status);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -54,7 +69,11 @@ export default async function SubmissionsPage({
       </div>
 
       <Suspense fallback={<SubmissionsSkeleton />}>
-        <SubmissionsClient initialSubmissions={submissions} initialStatus={status} />
+        <SubmissionsClient
+          initialSubmissions={submissions}
+          initialStatus={status}
+          statusCounts={statusCounts}
+        />
       </Suspense>
     </div>
   );

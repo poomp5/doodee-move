@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -26,14 +26,23 @@ const statusBadge: Record<string, string> = {
 export function SubmissionsClient({
   initialSubmissions,
   initialStatus,
+  statusCounts,
 }: {
   initialSubmissions: TransitSubmission[];
   initialStatus: string;
+  statusCounts: Record<string, number>;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [submissions, setSubmissions] = useState(initialSubmissions);
   const [activeTab, setActiveTab] = useState(initialStatus);
+  const [counts, setCounts] = useState(statusCounts);
+
+  useEffect(() => {
+    setSubmissions(initialSubmissions);
+    setActiveTab(initialStatus);
+    setCounts(statusCounts);
+  }, [initialSubmissions, initialStatus, statusCounts]);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [zoomImg, setZoomImg] = useState<string | null>(null);
 
@@ -52,11 +61,15 @@ export function SubmissionsClient({
       body: JSON.stringify({ id, action }),
     });
     if (res.ok) {
+      const newStatus = action === "approve" ? "approved" : "rejected";
       setSubmissions((prev) =>
-        prev.map((s) =>
-          s.id === id ? { ...s, status: action === "approve" ? "approved" : "rejected" } : s
-        )
+        prev.map((s) => s.id === id ? { ...s, status: newStatus } : s)
       );
+      setCounts((prev) => ({
+        ...prev,
+        pending: Math.max(0, (prev.pending ?? 0) - 1),
+        [newStatus]: (prev[newStatus] ?? 0) + 1,
+      }));
     }
     setActionLoading(null);
   }
@@ -67,24 +80,19 @@ export function SubmissionsClient({
   return (
     <>
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="bg-gray-100 rounded-xl p-1">
+        <TabsList className="bg-gray-100 rounded-xl p-1 h-auto gap-0.5">
           {STATUS_TABS.map((t) => {
-            const count =
-              t.value === "all"
-                ? submissions.length
-                : submissions.filter((s) => s.status === t.value).length;
+            const count = counts[t.value] ?? 0;
             return (
               <TabsTrigger
                 key={t.value}
                 value={t.value}
-                className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm"
+                className="rounded-lg px-4 py-2 text-sm font-medium data-[state=active]:bg-white data-[state=active]:shadow-sm"
               >
                 {t.label}
-                {count > 0 && (
-                  <span className="ml-1.5 text-xs bg-gray-200 data-[state=active]:bg-green-100 data-[state=active]:text-[#2E9C63] rounded-full px-1.5 py-0.5">
-                    {count}
-                  </span>
-                )}
+                <span className="ml-1.5 text-xs bg-gray-200 data-[state=active]:bg-green-100 data-[state=active]:text-[#2E9C63] rounded-full px-1.5 py-0.5 tabular-nums">
+                  {count}
+                </span>
               </TabsTrigger>
             );
           })}
