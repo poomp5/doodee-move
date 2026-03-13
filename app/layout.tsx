@@ -44,8 +44,7 @@ export const metadata: Metadata = {
 
   openGraph: {
     title: "Doodee Move | เดินทางอัจฉริยะ ลดคาร์บอน",
-    description:
-      "เลือกเส้นทางที่ดีที่สุด ลด CO₂ และร่วมสร้างเมืองที่ยั่งยืน",
+    description: "เลือกเส้นทางที่ดีที่สุด ลด CO₂ และร่วมสร้างเมืองที่ยั่งยืน",
     url: "https://dmove.site",
     siteName: "Doodee Move",
     images: [
@@ -63,9 +62,8 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Doodee Move | เดินทางอัจฉริยะ ลดคาร์บอน",
-    description:
-      "เลือกเส้นทางที่ดีที่สุด ลด CO₂ และร่วมสร้างเมืองที่ยั่งยืน",
-    images: ["/logo.png"],
+    description: "เลือกเส้นทางที่ดีที่สุด ลด CO₂ และร่วมสร้างเมืองที่ยั่งยืน",
+    images: ["/doodeemove.png"],
   },
 
   icons: {
