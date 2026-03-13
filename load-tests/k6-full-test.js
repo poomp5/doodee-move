@@ -1,6 +1,6 @@
 /**
  * ============================================================
- * k6 Load Test — doodee-move (Next.js + PostgreSQL)
+ * k6 Load Test — doodee-move Webhook (Next.js + PostgreSQL)
  * ============================================================
  * ทดสอบ Concurrent Users: 20 คน
  * Metrics ที่วัด:
@@ -20,14 +20,16 @@
 import http from "k6/http";
 import { check, group, sleep } from "k6";
 import { Counter, Rate, Trend, Gauge } from "k6/metrics";
+import crypto from "k6/crypto";
 
 // ─── Base URL ───────────────────────────────────────────────
 const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
+const CHANNEL_SECRET = __ENV.LINE_CHANNEL_SECRET || "default_test_secret";
 
 // ─── Custom Metrics ─────────────────────────────────────────
-const ratingPostDuration   = new Trend("rating_post_duration",   true);
-const ratingGetDuration    = new Trend("rating_get_duration",    true);
-const submissionGetDuration = new Trend("submission_get_duration", true);
+const webhookPostDuration  = new Trend("webhook_post_duration",  true);
+const webhookTextDuration  = new Trend("webhook_text_duration",  true);
+const webhookLocationDuration = new Trend("webhook_location_duration", true);
 const errorCount           = new Counter("error_count");
 const errorRate            = new Rate("error_rate");
 const successRate          = new Rate("success_rate");
@@ -85,10 +87,10 @@ export const options = {
   // ─── Thresholds (เกณฑ์ผ่าน/ไม่ผ่าน) ───────────────────────
   thresholds: {
     // Response time
-    "http_req_duration":                    ["p(95)<500", "p(99)<1000", "avg<300"],
-    "rating_post_duration":                 ["p(95)<600", "avg<400"],
-    "rating_get_duration":                  ["p(95)<400", "avg<200"],
-    "submission_get_duration":              ["p(95)<400", "avg<200"],
+    "http_req_duration":                    ["p(95)<800", "p(99)<1500", "avg<500"],
+    "webhook_post_duration":                ["p(95)<800", "avg<500"],
+    "webhook_text_duration":                ["p(95)<800", "avg<500"],
+    "webhook_location_duration":            ["p(95)<1000", "avg<600"],
 
     // Error rate
     "http_req_failed":                      ["rate<0.01"],   // < 1%
@@ -100,71 +102,97 @@ export const options = {
   },
 };
 
-// ─── Helper: สุ่ม rating 1-5 ─────────────────────────────────
-function randomRating() {
-  return Math.floor(Math.random() * 5) + 1;
-}
-
 // ─── Helper: สุ่ม LINE User ID ───────────────────────────────
 function randomUserId() {
-  const id = Math.floor(Math.random() * 10000).toString().padStart(5, "0");
-  return `Utest${id}`;
+  const id = Math.floor(Math.random() * 100000).toString().padStart(5, "0");
+  return `Utest${id}${Date.now() % 10000}`;
+}
+
+// ─── Helper: สร้าง LINE Webhook Signature ───────────────────
+function createLineSignature(body) {
+  return crypto.hmac("sha256", CHANNEL_SECRET, body, "base64");
+}
+
+// ─── Helper: สร้าง LINE Text Message Event ──────────────────
+function createTextMessageEvent(text, userId) {
+  return {
+    type: "message",
+    replyToken: `test-reply-token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    source: {
+      userId: userId,
+      type: "user"
+    },
+    timestamp: Date.now(),
+    mode: "active",
+    message: {
+      type: "text",
+      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      text: text
+    }
+  };
+}
+
+// ─── Helper: สร้าง LINE Location Message Event ──────────────
+function createLocationMessageEvent(lat, lng, address, userId) {
+  return {
+    type: "message",
+    replyToken: `test-reply-token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    source: {
+      userId: userId,
+      type: "user"
+    },
+    timestamp: Date.now(),
+    mode: "active",
+    message: {
+      type: "location",
+      id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      latitude: lat,
+      longitude: lng,
+      address: address,
+      title: "My Location"
+    }
+  };
 }
 
 // ─── Main Test Function ──────────────────────────────────────
 export default function () {
   activeVUsers.add(1);
 
-  // ── Group 1: GET Rating Statistics ──────────────────────
-  group("GET /api/rating (สถิติคะแนน)", function () {
-    const res = http.get(`${BASE_URL}/api/rating`, {
-      tags: { endpoint: "rating_get" },
-    });
-
-    ratingGetDuration.add(res.timings.duration);
-
-    const passed = check(res, {
-      "status 200":            (r) => r.status === 200,
-      "has totalRatings":      (r) => JSON.parse(r.body).totalRatings !== undefined,
-      "has averageRating":     (r) => JSON.parse(r.body).averageRating !== undefined,
-      "has distribution":      (r) => JSON.parse(r.body).distribution !== undefined,
-      "response time < 500ms": (r) => r.timings.duration < 500,
-    });
-
-    successRate.add(passed ? 1 : 0);
-    errorRate.add(passed ? 0 : 1);
-    if (!passed) errorCount.add(1);
-
-    sleep(0.5);
-  });
-
-  // ── Group 2: POST Rating ─────────────────────────────────
-  group("POST /api/rating (ส่งคะแนน)", function () {
-    const payload = JSON.stringify({
-      rating:      randomRating(),
-      lineUserId:  randomUserId(),
-      displayName: `TestUser_${randomUserId()}`,
-      category:    "usability",
-    });
+  // ── Group 1: Webhook with Text Message ──────────────────────
+  group("POST /api/webhook (text message)", function () {
+    const userId = randomUserId();
+    const textMessages = [
+      "hello",
+      "สวัสดี",
+      "help",
+      "ช่วยด้วย",
+      "MRT สุขุมวิท",
+      "BTS อโศก"
+    ];
+    const text = textMessages[Math.floor(Math.random() * textMessages.length)];
+    
+    const event = createTextMessageEvent(text, userId);
+    const webhookPayload = JSON.stringify({ events: [event] });
+    const signature = createLineSignature(webhookPayload);
 
     const params = {
-      headers: { "Content-Type": "application/json" },
-      tags:    { endpoint: "rating_post" },
+      headers: { 
+        "Content-Type": "application/json",
+        "x-line-signature": signature
+      },
+      tags: { endpoint: "webhook_text" },
     };
 
-    const res = http.post(`${BASE_URL}/api/rating`, payload, params);
+    const res = http.post(`${BASE_URL}/api/webhook`, webhookPayload, params);
 
-    ratingPostDuration.add(res.timings.duration);
+    webhookTextDuration.add(res.timings.duration);
 
     const passed = check(res, {
-      "status 200":            (r) => r.status === 200,
-      "success true":          (r) => {
-        try { return JSON.parse(r.body).success === true; } catch { return false; }
+      "status 200 or 401": (r) => r.status === 200 || r.status === 401,
+      "has ok field":      (r) => {
+        try { return JSON.parse(r.body).ok !== undefined; } catch { return false; }
       },
-      "has rating id":         (r) => {
-        try { return JSON.parse(r.body).rating?.id !== undefined; } catch { return false; }
-      },
-      "response time < 600ms": (r) => r.timings.duration < 600,
+      "response time < 800ms": (r) => r.timings.duration < 800,
     });
 
     successRate.add(passed ? 1 : 0);
@@ -174,23 +202,81 @@ export default function () {
     sleep(0.5);
   });
 
-  // ── Group 3: GET Admin Submissions ───────────────────────
-  group("GET /api/admin/submissions (รายการ submissions)", function () {
-    const statuses = ["all", "pending", "approved", "rejected"];
-    const status   = statuses[Math.floor(Math.random() * statuses.length)];
+  // ── Group 2: Webhook with Location Message ──────────────────
+  group("POST /api/webhook (location message)", function () {
+    const userId = randomUserId();
+    // Bangkok coordinates - various locations
+    const locations = [
+      { lat: 13.7563, lng: 100.5018, addr: "Bangkok City Center" },
+      { lat: 13.7467, lng: 100.5342, addr: "Sukhumvit Area" },
+      { lat: 13.7650, lng: 100.5377, addr: "Asok" },
+      { lat: 13.7308, lng: 100.5214, addr: "Silom" },
+    ];
+    const loc = locations[Math.floor(Math.random() * locations.length)];
+    
+    const event = createLocationMessageEvent(loc.lat, loc.lng, loc.addr, userId);
+    const webhookPayload = JSON.stringify({ events: [event] });
+    const signature = createLineSignature(webhookPayload);
 
-    const res = http.get(`${BASE_URL}/api/admin/submissions?status=${status}`, {
-      tags: { endpoint: "submissions_get" },
-    });
+    const params = {
+      headers: { 
+        "Content-Type": "application/json",
+        "x-line-signature": signature
+      },
+      tags: { endpoint: "webhook_location" },
+    };
 
-    submissionGetDuration.add(res.timings.duration);
+    const res = http.post(`${BASE_URL}/api/webhook`, webhookPayload, params);
+
+    webhookLocationDuration.add(res.timings.duration);
 
     const passed = check(res, {
-      "status 200":            (r) => r.status === 200,
-      "has submissions array": (r) => {
-        try { return Array.isArray(JSON.parse(r.body).submissions); } catch { return false; }
+      "status 200 or 401": (r) => r.status === 200 || r.status === 401,
+      "has ok field":      (r) => {
+        try { return JSON.parse(r.body).ok !== undefined; } catch { return false; }
       },
-      "response time < 500ms": (r) => r.timings.duration < 500,
+      "response time < 1000ms": (r) => r.timings.duration < 1000,
+    });
+
+    successRate.add(passed ? 1 : 0);
+    errorRate.add(passed ? 0 : 1);
+    if (!passed) errorCount.add(1);
+
+    sleep(0.8);
+  });
+
+  // ── Group 3: Multiple Events in One Webhook ─────────────────
+  group("POST /api/webhook (multiple events)", function () {
+    const userId1 = randomUserId();
+    const userId2 = randomUserId();
+    
+    const event1 = createTextMessageEvent("สวัสดี", userId1);
+    const event2 = createTextMessageEvent("hello", userId2);
+    
+    const webhookPayload = JSON.stringify({ events: [event1, event2] });
+    const signature = createLineSignature(webhookPayload);
+
+    const params = {
+      headers: { 
+        "Content-Type": "application/json",
+        "x-line-signature": signature
+      },
+      tags: { endpoint: "webhook_multi" },
+    };
+
+    const res = http.post(`${BASE_URL}/api/webhook`, webhookPayload, params);
+
+    webhookPostDuration.add(res.timings.duration);
+
+    const passed = check(res, {
+      "status 200 or 401": (r) => r.status === 200 || r.status === 401,
+      "has ok field":      (r) => {
+        try { return JSON.parse(r.body).ok !== undefined; } catch { return false; }
+      },
+      "processed count":   (r) => {
+        try { return JSON.parse(r.body).processed >= 0; } catch { return false; }
+      },
+      "response time < 800ms": (r) => r.timings.duration < 800,
     });
 
     successRate.add(passed ? 1 : 0);

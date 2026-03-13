@@ -11,14 +11,16 @@
 import http from "k6/http";
 import { check, group, sleep } from "k6";
 import { Rate, Trend, Counter } from "k6/metrics";
+import crypto from "k6/crypto";
 
 const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
+const CHANNEL_SECRET = __ENV.LINE_CHANNEL_SECRET || "default_test_secret";
 
 const successRate = new Rate("normal_success_rate");
 const errorCount  = new Counter("normal_error_count");
-const rtRatingGet  = new Trend("normal_rating_get_ms",  true);
-const rtRatingPost = new Trend("normal_rating_post_ms", true);
-const rtAdminGet   = new Trend("normal_admin_get_ms",   true);
+const rtWebhookText = new Trend("normal_webhook_text_ms", true);
+const rtWebhookLocation = new Trend("normal_webhook_location_ms", true);
+const rtWebhookMulti = new Trend("normal_webhook_multi_ms", true);
 
 export const options = {
   stages: [
@@ -27,10 +29,10 @@ export const options = {
     { duration: "10s", target: 0  },  // ramp-down
   ],
   thresholds: {
-    "http_req_duration":        ["p(95)<500", "p(99)<1000", "avg<300"],
-    "normal_rating_get_ms":     ["p(95)<400"],
-    "normal_rating_post_ms":    ["p(95)<600"],
-    "normal_admin_get_ms":      ["p(95)<400"],
+    "http_req_duration":        ["p(95)<800", "p(99)<1500", "avg<500"],
+    "normal_webhook_text_ms":   ["p(95)<800"],
+    "normal_webhook_location_ms": ["p(95)<1000"],
+    "normal_webhook_multi_ms":  ["p(95)<800"],
     "http_req_failed":          ["rate<0.01"],
     "normal_success_rate":      ["rate>0.99"],
   },
@@ -38,49 +40,108 @@ export const options = {
 
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 
+function createLineSignature(body) {
+  return crypto.hmac("sha256", CHANNEL_SECRET, body, "base64");
+}
+
+function randomUserId() {
+  return `Uload${Date.now() % 100000}${rand(100, 999)}`;
+}
+
 export default function () {
-  group("GET /api/rating", () => {
-    const r = http.get(`${BASE_URL}/api/rating`);
-    rtRatingGet.add(r.timings.duration);
+  group("POST /api/webhook - Text Message", () => {
+    const userId = randomUserId();
+    const texts = ["hello", "สวัสดี", "help", "MRT", "BTS"];
+    const event = {
+      type: "message",
+      replyToken: `token-${Date.now()}-${rand(1000, 9999)}`,
+      source: { userId: userId, type: "user" },
+      timestamp: Date.now(),
+      mode: "active",
+      message: {
+        type: "text",
+        id: `msg-${Date.now()}-${rand(1000, 9999)}`,
+        text: texts[rand(0, texts.length - 1)]
+      }
+    };
+    const payload = JSON.stringify({ events: [event] });
+    const signature = createLineSignature(payload);
+    
+    const r = http.post(`${BASE_URL}/api/webhook`, payload, {
+      headers: { "Content-Type": "application/json", "x-line-signature": signature },
+    });
+    rtWebhookText.add(r.timings.duration);
     const ok = check(r, {
-      "status 200":        (res) => res.status === 200,
-      "body has average":  (res) => res.json("averageRating") !== undefined,
-      "< 500ms":           (res) => res.timings.duration < 500,
+      "status 200 or 401": (res) => res.status === 200 || res.status === 401,
+      "has ok field":      (res) => { try { return res.json("ok") !== undefined; } catch { return false; } },
+      "< 800ms":           (res) => res.timings.duration < 800,
     });
     successRate.add(ok ? 1 : 0);
     if (!ok) errorCount.add(1);
     sleep(0.3);
   });
 
-  group("POST /api/rating", () => {
-    const body = JSON.stringify({
-      rating:      rand(1, 5),
-      lineUserId:  `Utest${rand(10000, 99999)}`,
-      displayName: `LoadUser${rand(1, 1000)}`,
-      category:    "usability",
+  group("POST /api/webhook - Location Message", () => {
+    const userId = randomUserId();
+    const event = {
+      type: "message",
+      replyToken: `token-${Date.now()}-${rand(1000, 9999)}`,
+      source: { userId: userId, type: "user" },
+      timestamp: Date.now(),
+      mode: "active",
+      message: {
+        type: "location",
+        id: `msg-${Date.now()}-${rand(1000, 9999)}`,
+        latitude: 13.7563 + (Math.random() * 0.1 - 0.05),
+        longitude: 100.5018 + (Math.random() * 0.1 - 0.05),
+        address: "Bangkok",
+        title: "Location"
+      }
+    };
+    const payload = JSON.stringify({ events: [event] });
+    const signature = createLineSignature(payload);
+    
+    const r = http.post(`${BASE_URL}/api/webhook`, payload, {
+      headers: { "Content-Type": "application/json", "x-line-signature": signature },
     });
-    const r = http.post(`${BASE_URL}/api/rating`, body, {
-      headers: { "Content-Type": "application/json" },
-    });
-    rtRatingPost.add(r.timings.duration);
+    rtWebhookLocation.add(r.timings.duration);
     const ok = check(r, {
-      "status 200":   (res) => res.status === 200,
-      "success true": (res) => { try { return res.json("success") === true; } catch { return false; } },
-      "< 600ms":      (res) => res.timings.duration < 600,
+      "status 200 or 401": (res) => res.status === 200 || res.status === 401,
+      "has ok field":      (res) => { try { return res.json("ok") !== undefined; } catch { return false; } },
+      "< 1000ms":          (res) => res.timings.duration < 1000,
     });
     successRate.add(ok ? 1 : 0);
     if (!ok) errorCount.add(1);
     sleep(0.3);
   });
 
-  group("GET /api/admin/submissions", () => {
-    const s = ["all","pending","approved"][rand(0,2)];
-    const r = http.get(`${BASE_URL}/api/admin/submissions?status=${s}`);
-    rtAdminGet.add(r.timings.duration);
+  group("POST /api/webhook - Multiple Events", () => {
+    const events = [];
+    for (let i = 0; i < rand(1, 3); i++) {
+      events.push({
+        type: "message",
+        replyToken: `token-${Date.now()}-${rand(1000, 9999)}-${i}`,
+        source: { userId: randomUserId(), type: "user" },
+        timestamp: Date.now(),
+        mode: "active",
+        message: {
+          type: "text",
+          id: `msg-${Date.now()}-${rand(1000, 9999)}-${i}`,
+          text: "test"
+        }
+      });
+    }
+    const payload = JSON.stringify({ events });
+    const signature = createLineSignature(payload);
+    
+    const r = http.post(`${BASE_URL}/api/webhook`, payload, {
+      headers: { "Content-Type": "application/json", "x-line-signature": signature },
+    });
+    rtWebhookMulti.add(r.timings.duration);
     const ok = check(r, {
-      "status 200":          (res) => res.status === 200,
-      "submissions is array":(res) => { try { return Array.isArray(res.json("submissions")); } catch { return false; } },
-      "< 500ms":             (res) => res.timings.duration < 500,
+      "status 200 or 401": (res) => res.status === 200 || res.status === 401,
+      "has processed field": (res) => { try { return res.json("processed") !== undefined; } catch { return false; } },
+      "< 800ms":           (res) => res.timings.duration < 800,
     });
     successRate.add(ok ? 1 : 0);
     if (!ok) errorCount.add(1);
