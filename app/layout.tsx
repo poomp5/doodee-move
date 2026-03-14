@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     siteName: "Doodee Move",
     images: [
       {
-        url: "/logo.png",
+        url: "/doodeemove.png",
         width: 1200,
         height: 630,
         alt: "Doodee Move - Smart Sustainable Mobility Platform",
