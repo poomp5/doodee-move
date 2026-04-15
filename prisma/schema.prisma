@@ -73,9 +73,14 @@ model UserRating {
   displayName String?  // Optional: store user name if available
   rating      Int      // 1-5 stars
   category    String   @default("usability") // usability, feature, overall, etc.
+  source      String   @default("web")
+  feedbackText String?
+  routeMode   String?
+  destLabel   String?
   userAgent   String?  // Browser/device info
   createdAt   DateTime @default(now())
   
   @@index([category, rating])
+  @@index([source, createdAt])
   @@index([createdAt])
 }

@@ -575,8 +575,9 @@ export function buildPDPAConsentFlex(): FlexMessage {
   };
 }
 
-export function buildRatingFlex(): FlexMessage {
+export function buildRouteRatingFlex(routeMode: string, destLabel: string): FlexMessage {
   const primaryColor = "#2a9c64";
+  const label = MODE_LABEL[routeMode] ?? routeMode;
 
   const bubble: any = {
     type: "bubble",
@@ -593,7 +594,7 @@ export function buildRatingFlex(): FlexMessage {
         },
         {
           type: "text",
-          text: "ระบบใช้งานง่ายแค่ไหน?",
+          text: "ให้คะแนนเส้นทางนี้",
           weight: "bold",
           size: "xl",
           color: "#ffffff",
@@ -603,7 +604,7 @@ export function buildRatingFlex(): FlexMessage {
         },
         {
           type: "text",
-          text: "ให้คะแนนประสบการณ์การใช้งาน",
+          text: `${label} ไป${destLabel}`,
           size: "sm",
           color: "#ffffff",
           align: "center",
@@ -622,7 +623,7 @@ export function buildRatingFlex(): FlexMessage {
       contents: [
         {
           type: "text",
-          text: "คลิกดาวเพื่อให้คะแนน",
+          text: "กดดาวเพื่อให้คะแนน แล้วพิมพ์ feedback เพิ่มเติมในแชตได้ทันที",
           size: "sm",
           color: "#666666",
           align: "center",
@@ -641,7 +642,7 @@ export function buildRatingFlex(): FlexMessage {
           action: {
             type: "postback",
             label: "⭐ 5",
-            data: "action=rate&rating=5",
+            data: `action=rate_route&rating=5&mode=${encodeURIComponent(routeMode)}`,
           },
           style: "primary",
           color: primaryColor,
@@ -652,7 +653,7 @@ export function buildRatingFlex(): FlexMessage {
           action: {
             type: "postback",
             label: "⭐ 4",
-            data: "action=rate&rating=4",
+            data: `action=rate_route&rating=4&mode=${encodeURIComponent(routeMode)}`,
           },
           style: "secondary",
           color: "#f5f5f5",
@@ -663,7 +664,7 @@ export function buildRatingFlex(): FlexMessage {
           action: {
             type: "postback",
             label: "⭐ 3",
-            data: "action=rate&rating=3",
+            data: `action=rate_route&rating=3&mode=${encodeURIComponent(routeMode)}`,
           },
           style: "secondary",
           color: "#f5f5f5",
@@ -674,7 +675,7 @@ export function buildRatingFlex(): FlexMessage {
           action: {
             type: "postback",
             label: "⭐ 2",
-            data: "action=rate&rating=2",
+            data: `action=rate_route&rating=2&mode=${encodeURIComponent(routeMode)}`,
           },
           style: "secondary",
           color: "#f5f5f5",
@@ -685,7 +686,7 @@ export function buildRatingFlex(): FlexMessage {
           action: {
             type: "postback",
             label: "⭐ 1",
-            data: "action=rate&rating=1",
+            data: `action=rate_route&rating=1&mode=${encodeURIComponent(routeMode)}`,
           },
           style: "secondary",
           color: "#f5f5f5",
@@ -698,7 +699,7 @@ export function buildRatingFlex(): FlexMessage {
 
   return {
     type: "flex",
-    altText: "ให้คะแนนความง่ายในการใช้งาน Doodee Move",
+    altText: `ให้คะแนนเส้นทาง ${label} ไป${destLabel}`,
     contents: bubble,
   };
 }

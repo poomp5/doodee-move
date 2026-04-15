@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans_Thai, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import RatingPrompt from "./components/RatingPrompt";
 
 const notoSansThai = Noto_Sans_Thai({
   variable: "--font-sans",
@@ -82,7 +81,6 @@ export default function RootLayout({
         className={`${notoSansThai.variable} antialiased`}
       >
         {children}
-        <RatingPrompt />
       </body>
     </html>
   );

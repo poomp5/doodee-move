@@ -14,10 +14,15 @@ export function AdminLogout() {
   return (
     <button
       onClick={handleLogout}
-      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+      className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
     >
-      <LogOut className="w-4 h-4" />
-      Sign out
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 bg-gray-50">
+        <LogOut className="h-4 w-4" />
+      </span>
+      <span className="text-left">
+        <span className="block text-sm font-semibold">Sign out</span>
+        <span className="block text-xs text-gray-400">ออกจากระบบหลังบ้าน</span>
+      </span>
     </button>
   );
 }

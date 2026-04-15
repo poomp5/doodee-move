@@ -2,28 +2,43 @@ import { Suspense } from "react";
 import { getPrisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Star } from "lucide-react";
+import { MessageSquareQuote, Star } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 async function RatingsOverview() {
   const prisma = getPrisma();
-  const [agg, groups, recent] = await Promise.all([
+  const [agg, groups, recent, textCount] = await Promise.all([
     prisma.userRating.aggregate({
-      where: { category: "usability" },
+      where: { source: "line_route_selection" },
       _avg: { rating: true },
       _count: { rating: true },
     }),
     prisma.userRating.groupBy({
       by: ["rating"],
-      where: { category: "usability" },
+      where: { source: "line_route_selection" },
       _count: { rating: true },
       orderBy: { rating: "desc" },
     }),
     prisma.userRating.findMany({
+      where: { source: "line_route_selection" },
       orderBy: { createdAt: "desc" },
-      take: 20,
-      select: { rating: true, displayName: true, createdAt: true },
+      take: 30,
+      select: {
+        id: true,
+        rating: true,
+        displayName: true,
+        createdAt: true,
+        feedbackText: true,
+        routeMode: true,
+        destLabel: true,
+      },
+    }),
+    prisma.userRating.count({
+      where: {
+        source: "line_route_selection",
+        feedbackText: { not: null },
+      },
     }),
   ]);
 
@@ -60,8 +75,8 @@ async function RatingsOverview() {
 
         <Card className="border-gray-100 shadow-none">
           <CardContent className="p-6 text-center">
-            <p className="text-4xl font-bold text-[#2E9C63]">{dist[5] + dist[4]}</p>
-            <p className="text-sm text-gray-500 mt-3">Positive (4-5 stars)</p>
+            <p className="text-4xl font-bold text-[#2E9C63]">{textCount}</p>
+            <p className="text-sm text-gray-500 mt-3">Feedback Messages</p>
           </CardContent>
         </Card>
       </div>
@@ -94,31 +109,47 @@ async function RatingsOverview() {
         </CardContent>
       </Card>
 
-      {/* Recent ratings */}
+      {/* Recent ratings and feedback */}
       <Card className="border-gray-100 shadow-none">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-gray-900">Recent Ratings</CardTitle>
+          <CardTitle className="text-base font-semibold text-gray-900">Recent LINE Feedback</CardTitle>
         </CardHeader>
         <CardContent className="divide-y divide-gray-50">
-          {recent.map((r, i) => (
-            <div key={i} className="flex items-center justify-between py-3">
-              <div>
-                <p className="text-sm font-medium text-gray-900">{r.displayName ?? "Anonymous"}</p>
-                <p className="text-xs text-gray-400">
-                  {new Date(r.createdAt).toLocaleDateString("th-TH", {
-                    day: "numeric", month: "short", year: "2-digit",
-                    hour: "2-digit", minute: "2-digit",
-                  })}
-                </p>
+          {recent.map((r) => (
+            <div key={r.id} className="py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900">{r.displayName ?? "Anonymous"}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {r.routeMode ?? "-"} ไป{r.destLabel ?? "-"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-0.5">
+                  {[1,2,3,4,5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`w-4 h-4 ${s <= r.rating ? "fill-amber-400 text-amber-400" : "text-gray-200 fill-gray-200"}`}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="flex gap-0.5">
-                {[1,2,3,4,5].map((s) => (
-                  <Star
-                    key={s}
-                    className={`w-4 h-4 ${s <= r.rating ? "fill-amber-400 text-amber-400" : "text-gray-200 fill-gray-200"}`}
-                  />
-                ))}
-              </div>
+              <p className="mt-2 text-xs text-gray-400">
+                {new Date(r.createdAt).toLocaleDateString("th-TH", {
+                  day: "numeric", month: "short", year: "2-digit",
+                  hour: "2-digit", minute: "2-digit",
+                })}
+              </p>
+              {r.feedbackText ? (
+                <div className="mt-3 rounded-2xl bg-[#f6f8f4] p-4">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-medium text-[#2E9C63]">
+                    <MessageSquareQuote className="h-3.5 w-3.5" />
+                    Customer feedback
+                  </div>
+                  <p className="text-sm leading-6 text-gray-700">{r.feedbackText}</p>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-gray-400">ไม่มีข้อความเพิ่มเติม</p>
+              )}
             </div>
           ))}
         </CardContent>
@@ -152,10 +183,10 @@ function RatingsSkeleton() {
 
 export default function RatingsPage() {
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Ratings</h1>
-        <p className="text-sm text-gray-500 mt-1">User satisfaction scores</p>
+        <h1 className="text-2xl font-bold text-gray-900">LINE Feedback</h1>
+        <p className="text-sm text-gray-500 mt-1">คะแนนและข้อความ feedback ที่ผู้ใช้ส่งหลังเลือกเส้นทางใน LINE</p>
       </div>
       <Suspense fallback={<RatingsSkeleton />}>
         <RatingsOverview />

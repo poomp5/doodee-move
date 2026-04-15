@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { validateSignature, messagingApi } from "@line/bot-sdk";
+import { validateSignature } from "@line/bot-sdk";
 import { lineClient, lineBlobClient } from "@/lib/line";
 
 const BOT_VERSION = "1.4.3";
@@ -13,8 +13,24 @@ type WebhookEvent = any;
 import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
 import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword, isInThailand } from "@/lib/maps";
-import { calcCo2Saved, calcPoints } from "@/lib/carbon";
-import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex, buildRatingFlex } from "@/lib/flex";
+import { calcCo2Saved } from "@/lib/carbon";
+import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex, buildRouteRatingFlex } from "@/lib/flex";
+
+type PendingFeedbackData = {
+  tripId?: string;
+  routeMode: string;
+  destLabel: string;
+  ratingId?: string;
+};
+
+function parsePendingFeedback(raw: string | null | undefined): PendingFeedbackData | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as PendingFeedbackData;
+  } catch {
+    return null;
+  }
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -118,9 +134,6 @@ async function handleEvent(event: WebhookEvent) {
       return;
     }
 
-    // --- Check for score command anytime ---
-    // Removed: point system no longer supported
-
     const session = await getSession(lineUserId);
 
     // --- Handle image messages (for map building) ---
@@ -211,10 +224,35 @@ async function handleEvent(event: WebhookEvent) {
         return;
       }
 
-      // --- Check for "ให้คะแนน" (Rate Us) request ---
-      if (text === "ให้คะแนน" || text === "ให้คะแนนแอป" || text === "rate" || text === "rating") {
-        const ratingFlex = buildRatingFlex();
-        await safeReply(replyToken, [ratingFlex]);
+      if (session?.step === "AWAITING_ROUTE_FEEDBACK") {
+        const feedbackContext = parsePendingFeedback(session.transitData);
+        if (!feedbackContext?.ratingId) {
+          await clearSession(lineUserId);
+          await safeReply(replyToken, [{
+            type: "text",
+            text: "สถานะ feedback หมดอายุแล้ว คุณสามารถเลือกเส้นทางใหม่เพื่อให้คะแนนอีกครั้งได้",
+          }]);
+          return;
+        }
+
+        if (text === "ข้าม" || text.toLowerCase() === "skip") {
+          await clearSession(lineUserId);
+          await safeReply(replyToken, [{
+            type: "text",
+            text: "รับทราบครับ ขอบคุณสำหรับคะแนนของคุณ ถ้าพร้อมเมื่อไรส่งตำแหน่งใหม่เพื่อหาเส้นทางต่อได้เลย",
+          }]);
+          return;
+        }
+
+        await prisma.userRating.update({
+          where: { id: feedbackContext.ratingId },
+          data: { feedbackText: text },
+        });
+        await clearSession(lineUserId);
+        await safeReply(replyToken, [{
+          type: "text",
+          text: `ขอบคุณสำหรับ feedback เพิ่มเติมเกี่ยวกับเส้นทางไป${feedbackContext.destLabel}\n\nทีมงานจะนำไปปรับปรุงต่อ และข้อความนี้ถูกส่งเข้าแอดมินเรียบร้อยแล้ว`,
+        }]);
         return;
       }
 
@@ -639,9 +677,6 @@ async function handleEvent(event: WebhookEvent) {
       return;
     }
 
-    // --- IDLE: รอรับ location ต้นทาง ---
-    // Removed: point system commands no longer respond
-
     // Default message
     await safeReply(replyToken, [{
       type: "text",
@@ -691,46 +726,20 @@ async function handlePostback(event: WebhookEvent) {
     return;
   }
 
-  // Handle rating submission
-  if (data.startsWith("action=rate")) {
+  // Handle rating submission after route selection
+  if (data.startsWith("action=rate_route")) {
     try {
-      // Parse rating from postback data: "action=rate&rating=5"
       const params = new URLSearchParams(data);
       const rating = parseInt(params.get("rating") || "0");
+      const session = await getSession(lineUserId);
+      const feedbackContext = parsePendingFeedback(session?.transitData);
 
-      if (rating < 1 || rating > 5) {
+      if (rating < 1 || rating > 5 || !session || session.step !== "AWAITING_ROUTE_FEEDBACK" || !feedbackContext) {
         return;
       }
 
       const prisma = getPrisma();
-      
-      // Check if user has already rated in the last 24 hours
-      const oneDayAgo = new Date();
-      oneDayAgo.setHours(oneDayAgo.getHours() - 24);
-      
-      const recentRating = await prisma.userRating.findFirst({
-        where: {
-          lineUserId,
-          createdAt: {
-            gte: oneDayAgo,
-          },
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
 
-      if (recentRating) {
-        // User has already rated recently
-        await safeReply(replyToken, [
-          {
-            type: "text",
-            text: `ขอบคุณที่ให้คะแนน! 🙏\n\nคุณได้ให้คะแนนไปแล้วเมื่อ ${recentRating.createdAt.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}\n\nสามารถให้คะแนนใหม่ได้อีกครั้งในอีก 24 ชั่วโมง`,
-          },
-        ]);
-        return;
-      }
-      
       // Get user info
       let displayName = "ผู้ใช้";
       try {
@@ -740,30 +749,35 @@ async function handlePostback(event: WebhookEvent) {
         // ignore profile read error
       }
 
-      // Save rating to database
-      await prisma.userRating.create({
+      const savedRating = await prisma.userRating.create({
         data: {
           rating,
           lineUserId,
           displayName,
-          category: "usability",
+          category: "route_experience",
+          source: "line_route_selection",
+          routeMode: feedbackContext.routeMode,
+          destLabel: feedbackContext.destLabel,
         },
       });
 
-      // Thank you message with different responses based on rating
-      let responseText = "";
-      if (rating >= 4) {
-        responseText = `🎉 ขอบคุณมากสำหรับคะแนน ${rating} ดาว!\n\nดีใจที่คุณชอบ Doodee Move เราจะพัฒนาให้ดียิ่งขึ้นไปเรื่อยๆ`;
-      } else if (rating === 3) {
-        responseText = `🙏 ขอบคุณสำหรับคะแนน ${rating} ดาว\n\nเราจะพัฒนาปรับปรุงให้ดีขึ้นต่อไป`;
-      } else {
-        responseText = `🙏 ขอบคุณสำหรับคะแนน ${rating} ดาว\n\nเราจะนำความคิดเห็นของคุณไปปรับปรุงให้ดีขึ้น หากมีข้อเสนอแนะเพิ่มเติม สามารถแจ้งทีมงานได้นะคะ`;
-      }
+      await setSession({
+        lineUserId,
+        step: "AWAITING_ROUTE_FEEDBACK",
+        transitData: JSON.stringify({
+          ...feedbackContext,
+          ratingId: savedRating.id,
+        }),
+      });
 
       await safeReply(replyToken, [
         {
           type: "text",
-          text: responseText,
+          text:
+            `ขอบคุณสำหรับคะแนน ${rating} ดาว\n\n` +
+            `หากต้องการบอกเพิ่มเติมเกี่ยวกับเส้นทาง ${feedbackContext.routeMode} ไป${feedbackContext.destLabel} ` +
+            `พิมพ์ feedback ต่อในแชตได้เลย\n\n` +
+            `ถ้าไม่ต้องการพิมพ์เพิ่ม ให้พิมพ์ "ข้าม"`,
         },
       ]);
     } catch (error) {
@@ -848,8 +862,30 @@ async function handlePostback(event: WebhookEvent) {
     // time on the reply token. log, too, so we know the handler reached this
     // point during debugging.
     const detailFlex = buildRouteDetailFlex(chosen, session.destLabel ?? "");
+    const ratingFlex = buildRouteRatingFlex(chosen.mode, session.destLabel ?? "");
+    await setSession({
+      lineUserId,
+      step: "AWAITING_ROUTE_FEEDBACK",
+      originLat: session.originLat ?? undefined,
+      originLng: session.originLng ?? undefined,
+      destLat: session.destLat ?? undefined,
+      destLng: session.destLng ?? undefined,
+      destLabel: session.destLabel ?? undefined,
+      pendingRoutes: session.pendingRoutes as any,
+      transitData: JSON.stringify({
+        routeMode: chosen.mode,
+        destLabel: session.destLabel ?? "",
+      }),
+    });
     console.log("[webhook] sending detail flex", { user: lineUserId, route: chosen.mode });
-    await safeReply(event.replyToken, [detailFlex]);
+    await safeReply(event.replyToken, [
+      detailFlex,
+      {
+        type: "text",
+        text: `ช่วยให้คะแนนเส้นทางนี้ได้เลยด้านล่าง และหากมีข้อเสนอแนะเพิ่มเติมสามารถพิมพ์ต่อในแชตได้ทันที`,
+      },
+      ratingFlex,
+    ]);
 
     // perform database work after reply; failure here is not fatal to the
     // user experience but should still be logged.
@@ -862,6 +898,7 @@ async function handlePostback(event: WebhookEvent) {
           user = await prisma.user.create({ data: { lineUserId, displayName: "ผู้ใช้" } });
         }
 
+        let createdTripId: string | undefined;
         if (
           session.originLat == null ||
           session.originLng == null ||
@@ -870,7 +907,7 @@ async function handlePostback(event: WebhookEvent) {
         ) {
           console.warn("[webhook] missing coordinates in session", session);
         } else {
-          await prisma.trip.create({
+          const trip = await prisma.trip.create({
             data: {
               user: { connect: { id: user.id } },
               originLat: session.originLat,
@@ -884,9 +921,18 @@ async function handlePostback(event: WebhookEvent) {
               points: 0,
             },
           });
+          createdTripId = trip.id;
         }
 
-        await clearSession(lineUserId);
+        await setSession({
+          lineUserId,
+          step: "AWAITING_ROUTE_FEEDBACK",
+          transitData: JSON.stringify({
+            tripId: createdTripId,
+            routeMode: chosen.mode,
+            destLabel: session.destLabel ?? "",
+          }),
+        });
         if (user) {
           await prisma.user.update({
             where: { id: user.id },
