@@ -12,7 +12,7 @@ const SHOW_BOT_VERSION = false; // Toggle to show/hide bot version in messages
 type WebhookEvent = any;
 import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
-import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword } from "@/lib/maps";
+import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword, isInThailand } from "@/lib/maps";
 import { calcCo2Saved, calcPoints } from "@/lib/carbon";
 import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex, buildRatingFlex } from "@/lib/flex";
 
@@ -425,10 +425,21 @@ async function handleEvent(event: WebhookEvent) {
 
     // --- รับ Location (first check if waiting for station location) ---
     if (msg.type === "location") {
+      const incomingLat = msg.latitude!;
+      const incomingLng = msg.longitude!;
+
+      if (!isInThailand(incomingLat, incomingLng)) {
+        await safeReply(replyToken, [{
+          type: "text",
+          text: "ขออภัย ปัจจุบัน Doodee Move ให้บริการเฉพาะภายในประเทศไทยเท่านั้น 🇹🇭\n\nกรุณาส่งตำแหน่งที่อยู่ในประเทศไทย",
+        }]);
+        return;
+      }
+
       // Handle WAITING_FOR_LOCATION_FOR_STATION
       if (session?.step === "WAITING_FOR_LOCATION_FOR_STATION") {
-        const originLat = msg.latitude!;
-        const originLng = msg.longitude!;
+        const originLat = incomingLat;
+        const originLng = incomingLng;
 
         try {
           const station = await getNearestTrainStationByKeyword(originLat, originLng);
@@ -465,8 +476,8 @@ async function handleEvent(event: WebhookEvent) {
 
       // Handle MAP_BUILDING_WAITING_LOCATION
       if (session?.step === "MAP_BUILDING_WAITING_LOCATION") {
-        const latitude = msg.latitude!;
-        const longitude = msg.longitude!;
+        const latitude = incomingLat;
+        const longitude = incomingLng;
 
         await setSession({
           lineUserId,
@@ -487,8 +498,8 @@ async function handleEvent(event: WebhookEvent) {
       if (session?.step === "WAITING_DESTINATION") {
         const originLat = session.originLat!;
         const originLng = session.originLng!;
-        const destLat = msg.latitude!;
-        const destLng = msg.longitude!;
+        const destLat = incomingLat;
+        const destLng = incomingLng;
         const destLabel = msg.address ?? msg.title ?? "ปลายทาง";
 
         // หาเส้นทาง
@@ -524,8 +535,8 @@ async function handleEvent(event: WebhookEvent) {
       await setSession({
         lineUserId,
         step: "WAITING_DESTINATION",
-        originLat: msg.latitude!,
-        originLng: msg.longitude!,
+        originLat: incomingLat,
+        originLng: incomingLng,
       });
       await safeReply(
         replyToken,

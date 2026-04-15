@@ -7,6 +7,24 @@ import {
 
 const mapsClient = new Client({});
 
+// Bounding box covering Thailand
+const THAILAND_BOUNDS = {
+  northeast: { lat: 20.5, lng: 105.7 },
+  southwest: { lat: 5.5, lng: 97.3 },
+};
+
+/**
+ * Returns true if the given coordinates are within Thailand's bounding box
+ */
+export function isInThailand(lat: number, lng: number): boolean {
+  return (
+    lat >= THAILAND_BOUNDS.southwest.lat &&
+    lat <= THAILAND_BOUNDS.northeast.lat &&
+    lng >= THAILAND_BOUNDS.southwest.lng &&
+    lng <= THAILAND_BOUNDS.northeast.lng
+  );
+}
+
 export type RouteResult = {
   mode: string;
   label: string;
@@ -189,34 +207,29 @@ export async function getRoutes(
  */
 export function parseThaiDirectionText(text: string): { origin: string; destination: string } | null {
   const trimmed = text.trim();
-  
-  // Pattern 1: "ไป[destination]จาก[origin]"
-  const pattern1 = /ไป(.+?)จาก(.+?)$/;
+
+  // Pattern 1: "จาก[origin]ไป[destination]" — most explicit, check first
+  // Use greedy match so origin captures everything up to the LAST "ไป"
+  const pattern1 = /^จาก(.+)ไป(.+)$/;
   const match1 = trimmed.match(pattern1);
   if (match1) {
+    // If origin/dest contain "ไป" or "จาก" themselves we risk splitting wrong.
+    // The greedy (.+) before ไป already grabs as much as possible, so the final
+    // "ไป" is the separator — which is the correct behaviour for Thai directions.
     return {
-      destination: match1[1].trim(),
-      origin: match1[2].trim(),
+      origin: match1[1].trim(),
+      destination: match1[2].trim(),
     };
   }
 
-  // Pattern 2: "จาก[origin]ไป[destination]"
-  const pattern2 = /จาก(.+?)ไป(.+?)$/;
+  // Pattern 2: "[origin]ไป[destination]" (no leading จาก)
+  // Use greedy so origin captures everything up to the LAST occurrence of ไป
+  const pattern2 = /^(.+)ไป(.+)$/;
   const match2 = trimmed.match(pattern2);
   if (match2) {
     return {
       origin: match2[1].trim(),
       destination: match2[2].trim(),
-    };
-  }
-
-  // Pattern 3: "[origin]ไป[destination]"
-  const pattern3 = /^(.+?)ไป(.+?)$/;
-  const match3 = trimmed.match(pattern3);
-  if (match3) {
-    return {
-      origin: match3[1].trim(),
-      destination: match3[2].trim(),
     };
   }
 
@@ -233,11 +246,26 @@ export async function geocodePlace(placeName: string): Promise<{ lat: number; ln
       params: {
         address: placeName,
         language: Language.th,
+        region: "th",
+        bounds: THAILAND_BOUNDS,
         key,
       },
     });
-    const result = res.data.results[0];
+
+    // Filter results to only those within Thailand bounds
+    const results = res.data.results.filter((r) => {
+      const { lat, lng } = r.geometry.location;
+      return (
+        lat >= THAILAND_BOUNDS.southwest.lat &&
+        lat <= THAILAND_BOUNDS.northeast.lat &&
+        lng >= THAILAND_BOUNDS.southwest.lng &&
+        lng <= THAILAND_BOUNDS.northeast.lng
+      );
+    });
+
+    const result = results[0] ?? res.data.results[0];
     if (!result) return null;
+    console.log(`[geocodePlace] "${placeName}" → (${result.geometry.location.lat}, ${result.geometry.location.lng}) — ${result.formatted_address}`);
     return {
       lat: result.geometry.location.lat,
       lng: result.geometry.location.lng,
