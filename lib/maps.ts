@@ -363,6 +363,83 @@ export async function getNearestTrainStationByKeyword(
 }
 
 /**
+ * Get nearby restaurants from a given location
+ * Returns top 3 restaurants sorted by rating
+ */
+export type RestaurantResult = {
+  name: string;
+  rating?: number;
+  lat: number;
+  lng: number;
+  distanceKm: number;
+  photoUrl?: string;
+  openNow?: boolean;
+  address?: string;
+  placeId?: string;
+};
+
+export async function getNearbyRestaurants(
+  lat: number,
+  lng: number,
+  radiusMeters: number = 1500
+): Promise<RestaurantResult[]> {
+  const key = process.env.GOOGLE_MAPS_API_KEY!;
+  const restaurants: RestaurantResult[] = [];
+
+  try {
+    const res = await mapsClient.placesNearby({
+      params: {
+        location: { lat, lng },
+        radius: radiusMeters,
+        type: "restaurant",
+        language: Language.th,
+        key,
+      },
+    });
+
+    if (res.data.results && res.data.results.length > 0) {
+      for (const result of res.data.results) {
+        if (!result.geometry || !result.name) continue;
+
+        const restaurantLat = result.geometry.location.lat;
+        const restaurantLng = result.geometry.location.lng;
+        const distance = calculateDistance(lat, lng, restaurantLat, restaurantLng);
+
+        let photoUrl: string | undefined;
+        if (result.photos && result.photos.length > 0) {
+          const photo = result.photos[0];
+          photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photo.photo_reference}&key=${key}`;
+        }
+
+        restaurants.push({
+          name: result.name,
+          rating: result.rating,
+          lat: restaurantLat,
+          lng: restaurantLng,
+          distanceKm: distance,
+          photoUrl,
+          openNow: result.opening_hours?.open_now,
+          address: result.vicinity,
+          placeId: result.place_id,
+        });
+      }
+    }
+  } catch (err) {
+    console.error("[getNearbyRestaurants] Error fetching restaurants:", err);
+  }
+
+  // Sort by rating (descending), then by distance (ascending)
+  restaurants.sort((a, b) => {
+    const ratingDiff = (b.rating || 0) - (a.rating || 0);
+    if (ratingDiff !== 0) return ratingDiff;
+    return a.distanceKm - b.distanceKm;
+  });
+
+  // Return top 3
+  return restaurants.slice(0, 3);
+}
+
+/**
  * Calculate distance between two coordinates in kilometers using Haversine formula
  */
 function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {

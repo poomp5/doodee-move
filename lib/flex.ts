@@ -4,7 +4,7 @@
 type FlexMessage = any;
 type FlexBubble = any;
 type FlexCarousel = any;
-import { RouteResult } from "./maps";
+import { RouteResult, RestaurantResult } from "./maps";
 import { calcCo2Saved, calcPoints, MODE_LABEL } from "./carbon";
 
 function buildRouteBubble(route: RouteResult): FlexBubble {
@@ -701,5 +701,199 @@ export function buildRouteRatingFlex(routeMode: string, destLabel: string): Flex
     type: "flex",
     altText: `ให้คะแนนเส้นทาง ${label} ไป${destLabel}`,
     contents: bubble,
+  };
+}
+
+export function buildRestaurantsFlex(restaurants: RestaurantResult[]): FlexMessage {
+  const primaryColor = "#2a9c64";
+  const bubbles: FlexBubble[] = restaurants.map((restaurant) => {
+    const ratingStars = restaurant.rating 
+      ? "⭐".repeat(Math.floor(restaurant.rating)) + (restaurant.rating % 1 >= 0.5 ? "⭐" : "")
+      : "ไม่มีข้อมูลการจัดอันดับ";
+    
+    const bodyContents: any[] = [
+      {
+        type: "text",
+        text: restaurant.name,
+        weight: "bold",
+        size: "lg",
+        color: "#333333",
+        wrap: true,
+      },
+    ];
+
+    // Add photo if available
+    if (restaurant.photoUrl) {
+      bodyContents.push({
+        type: "image",
+        url: restaurant.photoUrl,
+        size: "full",
+        aspectRatio: "16:9",
+        aspectMode: "cover",
+        margin: "md",
+      });
+    }
+
+    // Add rating
+    bodyContents.push({
+      type: "box",
+      layout: "vertical",
+      spacing: "xs",
+      margin: "md",
+      contents: [
+        {
+          type: "text",
+          text: ratingStars,
+          size: "sm",
+          color: "#ff8800",
+          wrap: true,
+        },
+        {
+          type: "text",
+          text: restaurant.rating ? `${restaurant.rating.toFixed(1)}/5.0` : "-",
+          size: "xs",
+          color: "#999999",
+        },
+      ],
+    });
+
+    // Add distance
+    bodyContents.push({
+      type: "box",
+      layout: "horizontal",
+      spacing: "md",
+      margin: "md",
+      contents: [
+        {
+          type: "box",
+          layout: "vertical",
+          flex: 0,
+          width: "24px",
+          height: "24px",
+          backgroundColor: "#f0f8f5",
+          cornerRadius: "4px",
+          contents: [
+            {
+              type: "text",
+              text: "📍",
+              size: "sm",
+              align: "center",
+              flex: 0,
+            },
+          ],
+          justifyContent: "center",
+          alignItems: "center",
+        },
+        {
+          type: "box",
+          layout: "vertical",
+          flex: 1,
+          contents: [
+            {
+              type: "text",
+              text: "ระยะทาง",
+              size: "xs",
+              color: "#999999",
+            },
+            {
+              type: "text",
+              text: `${restaurant.distanceKm.toFixed(2)} km`,
+              size: "sm",
+              weight: "bold",
+              color: "#333333",
+            },
+          ],
+        },
+      ],
+    });
+
+    // Add address if available
+    if (restaurant.address) {
+      bodyContents.push({
+        type: "text",
+        text: restaurant.address,
+        size: "xs",
+        color: "#666666",
+        wrap: true,
+        margin: "md",
+      });
+    }
+
+    // Add status if available
+    if (restaurant.openNow !== undefined) {
+      const statusText = restaurant.openNow ? "📍 เปิดอยู่" : "🔒 ปิดแล้ว";
+      const statusColor = restaurant.openNow ? "#2a9c64" : "#999999";
+      bodyContents.push({
+        type: "text",
+        text: statusText,
+        size: "xs",
+        color: statusColor,
+        margin: "md",
+      });
+    }
+
+    return {
+      type: "bubble",
+      size: "kilo",
+      header: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "text",
+            text: "🍽️",
+            size: "xl",
+            align: "center",
+          },
+          {
+            type: "text",
+            text: "ร้านอาหารใกล้เคียง",
+            weight: "bold",
+            size: "lg",
+            color: "#ffffff",
+            align: "center",
+            margin: "md",
+          },
+        ],
+        backgroundColor: primaryColor,
+        paddingAll: "16px",
+        spacing: "sm",
+      },
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        contents: bodyContents,
+        paddingAll: "16px",
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        spacing: "xs",
+        contents: [
+          {
+            type: "button",
+            action: {
+              type: "postback",
+              label: "🗺️ นำทาง",
+              data: `action=navigate_restaurant&lat=${restaurant.lat}&lng=${restaurant.lng}&name=${encodeURIComponent(restaurant.name)}`,
+            },
+            style: "primary",
+            color: primaryColor,
+            height: "sm",
+          },
+        ],
+        paddingAll: "12px",
+      },
+    };
+  });
+
+  return {
+    type: "flex",
+    altText: "ร้านอาหารใกล้เคียง",
+    contents: {
+      type: "carousel",
+      contents: bubbles,
+    },
   };
 }

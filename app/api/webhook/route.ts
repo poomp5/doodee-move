@@ -12,9 +12,9 @@ const SHOW_BOT_VERSION = false; // Toggle to show/hide bot version in messages
 type WebhookEvent = any;
 import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
-import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword, isInThailand } from "@/lib/maps";
+import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword, isInThailand, getNearbyRestaurants } from "@/lib/maps";
 import { calcCo2Saved } from "@/lib/carbon";
-import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex, buildRouteRatingFlex } from "@/lib/flex";
+import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex, buildRouteRatingFlex, buildRestaurantsFlex } from "@/lib/flex";
 
 type PendingFeedbackData = {
   tripId?: string;
@@ -863,6 +863,20 @@ async function handlePostback(event: WebhookEvent) {
     // point during debugging.
     const detailFlex = buildRouteDetailFlex(chosen, session.destLabel ?? "");
     const ratingFlex = buildRouteRatingFlex(chosen.mode, session.destLabel ?? "");
+    
+    // Fetch nearby restaurants at destination
+    let restaurantsFlex: any = null;
+    try {
+      if (session.destLat && session.destLng) {
+        const restaurants = await getNearbyRestaurants(session.destLat, session.destLng);
+        if (restaurants && restaurants.length > 0) {
+          restaurantsFlex = buildRestaurantsFlex(restaurants);
+        }
+      }
+    } catch (err) {
+      console.error("[webhook] Error fetching restaurants", err);
+      // Continue without restaurant recommendations
+    }
     await setSession({
       lineUserId,
       step: "AWAITING_ROUTE_FEEDBACK",
@@ -878,14 +892,14 @@ async function handlePostback(event: WebhookEvent) {
       }),
     });
     console.log("[webhook] sending detail flex", { user: lineUserId, route: chosen.mode });
-    await safeReply(event.replyToken, [
-      detailFlex,
-      {
-        type: "text",
-        text: `ช่วยให้คะแนนเส้นทางนี้ได้เลยด้านล่าง และหากมีข้อเสนอแนะเพิ่มเติมสามารถพิมพ์ต่อในแชตได้ทันที`,
-      },
-      ratingFlex,
-    ]);
+    
+    // Build reply messages - include restaurants if found
+    const replyMessages = [detailFlex, ratingFlex];
+    if (restaurantsFlex) {
+      replyMessages.push(restaurantsFlex);
+    }
+    
+    await safeReply(event.replyToken, replyMessages);
 
     // perform database work after reply; failure here is not fatal to the
     // user experience but should still be logged.
