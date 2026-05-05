@@ -376,6 +376,8 @@ export type RestaurantResult = {
   openNow?: boolean;
   address?: string;
   placeId?: string;
+  priceLevel?: number; // 0-4 scale for price range
+  types?: string[]; // restaurant types/categories
 };
 
 export async function getNearbyRestaurants(
@@ -408,7 +410,13 @@ export async function getNearbyRestaurants(
         let photoUrl: string | undefined;
         if (result.photos && result.photos.length > 0) {
           const photo = result.photos[0];
-          photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${photo.photo_reference}&key=${key}`;
+          // Construct photo URL with proper parameters
+          photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&maxheight=300&photo_reference=${photo.photo_reference}&key=${key}`;
+          console.log(`[getNearbyRestaurants] Photo found for ${result.name}: ${photoUrl}`);
+        } else {
+          console.log(`[getNearbyRestaurants] No photo available for ${result.name}, using map fallback`);
+          // Fallback: Generate a static map image showing restaurant location
+          photoUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${restaurantLat},${restaurantLng}&zoom=18&size=400x300&maptype=roadmap&markers=color:red%7Clabel:R%7C${restaurantLat},${restaurantLng}&key=${key}`;
         }
 
         restaurants.push({
@@ -421,6 +429,8 @@ export async function getNearbyRestaurants(
           openNow: result.opening_hours?.open_now,
           address: result.vicinity,
           placeId: result.place_id,
+          priceLevel: result.price_level,
+          types: result.types,
         });
       }
     }

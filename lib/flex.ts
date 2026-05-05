@@ -728,36 +728,68 @@ export function buildRestaurantsFlex(restaurants: RestaurantResult[]): FlexMessa
         type: "image",
         url: restaurant.photoUrl,
         size: "full",
-        aspectRatio: "16:9",
+        aspectRatio: "4:3",
         aspectMode: "cover",
         margin: "md",
+        backgroundColor: "#f5f5f5",
+      });
+    } else {
+      // Fallback image - restaurant icon
+      bodyContents.push({
+        type: "box",
+        layout: "vertical",
+        height: "120px",
+        backgroundColor: "#f8f9fa",
+        cornerRadius: "8px",
+        margin: "md",
+        contents: [
+          {
+            type: "text",
+            text: "🍽️",
+            size: "xxl",
+            align: "center",
+            flex: 1,
+          },
+        ],
+        justifyContent: "center",
       });
     }
 
-    // Add rating
-    bodyContents.push({
-      type: "box",
-      layout: "vertical",
-      spacing: "xs",
-      margin: "md",
-      contents: [
-        {
-          type: "text",
-          text: ratingStars,
-          size: "sm",
-          color: "#ff8800",
-          wrap: true,
-        },
-        {
-          type: "text",
-          text: restaurant.rating ? `${restaurant.rating.toFixed(1)}/5.0` : "-",
-          size: "xs",
-          color: "#999999",
-        },
-      ],
-    });
+    // Add rating and price info
+    const ratingInfo = [];
+    if (restaurant.rating) {
+      ratingInfo.push(`${restaurant.rating.toFixed(1)} ⭐`);
+    }
+    if (restaurant.priceLevel !== undefined) {
+      const priceSymbols = '💰'.repeat(restaurant.priceLevel + 1);
+      ratingInfo.push(priceSymbols);
+    }
 
-    // Add distance
+    if (ratingInfo.length > 0) {
+      bodyContents.push({
+        type: "box",
+        layout: "horizontal",
+        spacing: "md",
+        margin: "md",
+        contents: [
+          {
+            type: "text",
+            text: ratingInfo.join(" • "),
+            size: "sm",
+            color: "#666666",
+            flex: 1,
+          },
+        ],
+      });
+    }
+
+    // Add distance and status
+    const statusInfo = [];
+    statusInfo.push(`📍 ${restaurant.distanceKm.toFixed(1)} km`);
+    if (restaurant.openNow !== undefined) {
+      statusInfo.push(restaurant.openNow ? "🟢 เปิดอยู่" : "🔴 ปิดแล้ว");
+    }
+
     bodyContents.push({
       type: "box",
       layout: "horizontal",
@@ -765,44 +797,11 @@ export function buildRestaurantsFlex(restaurants: RestaurantResult[]): FlexMessa
       margin: "md",
       contents: [
         {
-          type: "box",
-          layout: "vertical",
-          flex: 0,
-          width: "24px",
-          height: "24px",
-          backgroundColor: "#f0f8f5",
-          cornerRadius: "4px",
-          contents: [
-            {
-              type: "text",
-              text: "📍",
-              size: "sm",
-              align: "center",
-              flex: 0,
-            },
-          ],
-          justifyContent: "center",
-          alignItems: "center",
-        },
-        {
-          type: "box",
-          layout: "vertical",
+          type: "text",
+          text: statusInfo.join(" • "),
+          size: "xs",
+          color: "#666666",
           flex: 1,
-          contents: [
-            {
-              type: "text",
-              text: "ระยะทาง",
-              size: "xs",
-              color: "#999999",
-            },
-            {
-              type: "text",
-              text: `${restaurant.distanceKm.toFixed(2)} km`,
-              size: "sm",
-              weight: "bold",
-              color: "#333333",
-            },
-          ],
         },
       ],
     });
@@ -819,17 +818,21 @@ export function buildRestaurantsFlex(restaurants: RestaurantResult[]): FlexMessa
       });
     }
 
-    // Add status if available
-    if (restaurant.openNow !== undefined) {
-      const statusText = restaurant.openNow ? "📍 เปิดอยู่" : "🔒 ปิดแล้ว";
-      const statusColor = restaurant.openNow ? "#2a9c64" : "#999999";
-      bodyContents.push({
-        type: "text",
-        text: statusText,
-        size: "xs",
-        color: statusColor,
-        margin: "md",
-      });
+    // Add restaurant type if available
+    if (restaurant.types && restaurant.types.length > 0) {
+      const relevantTypes = restaurant.types
+        .filter(type => !['restaurant', 'food', 'point_of_interest', 'establishment'].includes(type))
+        .slice(0, 2); // Show max 2 types
+      
+      if (relevantTypes.length > 0) {
+        bodyContents.push({
+          type: "text",
+          text: `🏷️ ${relevantTypes.join(", ")}`,
+          size: "xs",
+          color: "#888888",
+          margin: "md",
+        });
+      }
     }
 
     return {
