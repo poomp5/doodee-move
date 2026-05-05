@@ -858,105 +858,128 @@ async function handlePostback(event: WebhookEvent) {
 
     const co2Saved = calcCo2Saved(chosen.distanceKm, chosen.mode);
 
-    // respond first, before touching the database so we don’t run out of
-    // time on the reply token. log, too, so we know the handler reached this
-    // point during debugging.
-    const detailFlex = buildRouteDetailFlex(chosen, session.destLabel ?? "");
-    const ratingFlex = buildRouteRatingFlex(chosen.mode, session.destLabel ?? "");
-    
-    // Fetch nearby restaurants at destination
-    let restaurantsFlex: any = null;
     try {
-      if (session.destLat && session.destLng) {
-        const restaurants = await getNearbyRestaurants(session.destLat, session.destLng);
-        if (restaurants && restaurants.length > 0) {
-          restaurantsFlex = buildRestaurantsFlex(restaurants);
-        }
-      }
-    } catch (err) {
-      console.error("[webhook] Error fetching restaurants", err);
-      // Continue without restaurant recommendations
-    }
-    await setSession({
-      lineUserId,
-      step: "AWAITING_ROUTE_FEEDBACK",
-      originLat: session.originLat ?? undefined,
-      originLng: session.originLng ?? undefined,
-      destLat: session.destLat ?? undefined,
-      destLng: session.destLng ?? undefined,
-      destLabel: session.destLabel ?? undefined,
-      pendingRoutes: session.pendingRoutes as any,
-      transitData: JSON.stringify({
-        routeMode: chosen.mode,
-        destLabel: session.destLabel ?? "",
-      }),
-    });
-    console.log("[webhook] sending detail flex", { user: lineUserId, route: chosen.mode });
-    
-    // Build reply messages - include restaurants if found
-    const replyMessages = [detailFlex, ratingFlex];
-    if (restaurantsFlex) {
-      replyMessages.push(restaurantsFlex);
-    }
-    
-    await safeReply(event.replyToken, replyMessages);
+      // Perform ALL database operations BEFORE replying to LINE
+      const prisma = getPrisma();
 
-    // perform database work after reply; failure here is not fatal to the
-    // user experience but should still be logged.
-    (async () => {
+      console.log("[webhook] Starting database operations for route selection");
+
+      // Get user profile for display name
+      let displayName = "ผู้ใช้";
       try {
-        const prisma = getPrisma();
-        // ensure user exists (should be, but just in case)
-        let user = await prisma.user.findUnique({ where: { lineUserId } });
-        if (!user) {
-          user = await prisma.user.create({ data: { lineUserId, displayName: "ผู้ใช้" } });
-        }
-
-        let createdTripId: string | undefined;
-        if (
-          session.originLat == null ||
-          session.originLng == null ||
-          session.destLat == null ||
-          session.destLng == null
-        ) {
-          console.warn("[webhook] missing coordinates in session", session);
-        } else {
-          const trip = await prisma.trip.create({
-            data: {
-              user: { connect: { id: user.id } },
-              originLat: session.originLat,
-              originLng: session.originLng,
-              destLat: session.destLat,
-              destLng: session.destLng,
-              destLabel: session.destLabel ?? "",
-              mode: chosen.mode,
-              distanceKm: chosen.distanceKm,
-              co2Saved,
-              points: 0,
-            },
-          });
-          createdTripId = trip.id;
-        }
-
-        await setSession({
-          lineUserId,
-          step: "AWAITING_ROUTE_FEEDBACK",
-          transitData: JSON.stringify({
-            tripId: createdTripId,
-            routeMode: chosen.mode,
-            destLabel: session.destLabel ?? "",
-          }),
-        });
-        if (user) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: { totalCo2Saved: { increment: co2Saved } },
-          });
-        }
-      } catch (dbErr) {
-        console.error("[webhook] postback DB error", dbErr);
+        const profile = await lineClient.getProfile(lineUserId);
+        displayName = profile.displayName;
+      } catch {
+        // ignore profile read error
       }
-    })();
+
+      // Ensure user exists
+      let user = await prisma.user.findUnique({ where: { lineUserId } });
+      if (!user) {
+        user = await prisma.user.create({
+          data: { lineUserId, displayName, pdpaConsent: true }
+        });
+        console.log("[webhook] Created new user:", user.id);
+      }
+
+      // Create trip record if we have coordinates
+      let createdTripId: string | undefined;
+      if (
+        session.originLat != null &&
+        session.originLng != null &&
+        session.destLat != null &&
+        session.destLng != null
+      ) {
+        const trip = await prisma.trip.create({
+          data: {
+            user: { connect: { id: user.id } },
+            originLat: session.originLat,
+            originLng: session.originLng,
+            destLat: session.destLat,
+            destLng: session.destLng,
+            destLabel: session.destLabel ?? "",
+            mode: chosen.mode,
+            distanceKm: chosen.distanceKm,
+            co2Saved,
+            points: 0,
+          },
+        });
+        createdTripId = trip.id;
+        console.log("[webhook] Created trip:", createdTripId);
+
+        // Update user's total CO2 saved
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { totalCo2Saved: { increment: co2Saved } },
+        });
+        console.log("[webhook] Updated user CO2 saved");
+      }
+
+      // Update session for feedback
+      await setSession({
+        lineUserId,
+        step: "AWAITING_ROUTE_FEEDBACK",
+        originLat: session.originLat ?? undefined,
+        originLng: session.originLng ?? undefined,
+        destLat: session.destLat ?? undefined,
+        destLng: session.destLng ?? undefined,
+        destLabel: session.destLabel ?? undefined,
+        pendingRoutes: session.pendingRoutes as any,
+        transitData: JSON.stringify({
+          tripId: createdTripId,
+          routeMode: chosen.mode,
+          destLabel: session.destLabel ?? "",
+        }),
+      });
+      console.log("[webhook] Updated session for feedback");
+
+      // Build flex messages
+      const detailFlex = buildRouteDetailFlex(chosen, session.destLabel ?? "");
+      const ratingFlex = buildRouteRatingFlex(chosen.mode, session.destLabel ?? "");
+
+      // Fetch nearby restaurants at destination
+      let restaurantsFlex: any = null;
+      try {
+        if (session.destLat && session.destLng) {
+          console.log("[webhook] Fetching restaurants for destination:", session.destLat, session.destLng);
+          const restaurants = await getNearbyRestaurants(session.destLat, session.destLng);
+          if (restaurants && restaurants.length > 0) {
+            restaurantsFlex = buildRestaurantsFlex(restaurants);
+            console.log(`[webhook] Found ${restaurants.length} restaurants`);
+          } else {
+            console.log("[webhook] No restaurants found");
+          }
+        }
+      } catch (err) {
+        console.error("[webhook] Error fetching restaurants", err);
+        // Continue without restaurant recommendations
+      }
+
+      console.log("[webhook] sending detail flex", { user: lineUserId, route: chosen.mode });
+
+      // Build reply messages - include restaurants if found
+      const replyMessages = [detailFlex, ratingFlex];
+      if (restaurantsFlex) {
+        replyMessages.push(restaurantsFlex);
+      }
+
+      // Reply to LINE AFTER all database work is complete
+      console.log("[webhook] Replying to LINE with", replyMessages.length, "messages");
+      await safeReply(event.replyToken, replyMessages);
+      console.log("[webhook] Successfully replied to LINE");
+
+    } catch (error) {
+      console.error("[webhook] Route selection error:", error);
+      // Still try to reply to LINE even if database operations fail
+      try {
+        console.log("[webhook] Attempting fallback reply to LINE");
+        const detailFlex = buildRouteDetailFlex(chosen, session.destLabel ?? "");
+        await safeReply(event.replyToken, [detailFlex]);
+        console.log("[webhook] Fallback reply successful");
+      } catch (replyError) {
+        console.error("[webhook] Failed to reply to LINE:", replyError);
+      }
+    }
   }
 }
 
