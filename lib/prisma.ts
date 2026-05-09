@@ -13,7 +13,7 @@ function createPrismaClient(): PrismaClient {
     adapter,
     // Disable transaction support for HTTP adapter
     transactionOptions: {
-      maxWait: 0,
+      maxWait: 1,
       timeout: 0,
     },
   });

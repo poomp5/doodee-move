@@ -205,6 +205,39 @@ async function handleEvent(event: WebhookEvent) {
     if (msg.type === "text") {
       const text = (msg.text ?? "").trim();
 
+      // --- Debug command ---
+      if (text.toLowerCase() === "debug") {
+        const debugInfo = {
+          lineUserId,
+          userDisplayName: user.displayName,
+          pdpaConsent: user.pdpaConsent,
+          session: session ? {
+            step: session.step,
+            originLat: session.originLat,
+            originLng: session.originLng,
+            destLat: session.destLat,
+            destLng: session.destLng,
+            destLabel: session.destLabel,
+            transitImageUrl: session.transitImageUrl,
+            transitData: session.transitData,
+          } : null,
+          botVersion: BOT_VERSION,
+          timestamp: new Date().toISOString(),
+          environment: {
+            nodeVersion: process.version,
+            databaseUrl: process.env.DATABASE_URL ? "configured" : "missing",
+            lineChannelSecret: process.env.LINE_CHANNEL_SECRET ? "configured" : "missing",
+            lineAccessToken: process.env.LINE_ACCESS_TOKEN ? "configured" : "missing",
+            nextPublicAppUrl: process.env.NEXT_PUBLIC_APP_URL || "not set",
+          },
+        };
+        await safeReply(replyToken, [{
+          type: "text",
+          text: `🔧 Debug Info:\n${JSON.stringify(debugInfo, null, 2)}`,
+        }]);
+        return;
+      }
+
       // --- Check for "ยกเลิก" (Cancel) to restart ---
       if (text === "ยกเลิก" || text === "cancel" || text === "เริ่มใหม่") {
         await clearSession(lineUserId);
