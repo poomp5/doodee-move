@@ -719,9 +719,18 @@ async function handleEvent(event: WebhookEvent) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : undefined;
     console.error("[webhook] Event processing failed", { lineUserId, errMsg, errStack });
+    
+    // Add specific error info if possible
+    let errorSuffix = "";
+    if (errMsg.toLowerCase().includes("quota") || errMsg.toLowerCase().includes("limit") || errMsg.toLowerCase().includes("exceeded")) {
+      errorSuffix = " (out of credit)";
+    } else if (errMsg.toLowerCase().includes("invalid") && errMsg.toLowerCase().includes("key")) {
+      errorSuffix = " (invalid API key)";
+    }
+    
     await safeReply(replyToken, [{
       type: "text",
-      text: "ขออภัย ระบบมีปัญหาชั่วคราว ลองใหม่อีกสักครู่นะ",
+      text: `ขออภัย ระบบมีปัญหาชั่วคราว ลองใหม่อีกสักครู่นะ${errorSuffix}`,
     }]);
   }
 }
