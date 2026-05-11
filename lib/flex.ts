@@ -249,6 +249,7 @@ export function buildRouteDetailFlex(
     selectedRouteDistanceKm?: number;
     restaurantSearchAttempted?: boolean;
     restaurantsFound?: number;
+    restaurantError?: string | null;
     googleMapsApiKeyConfigured?: boolean;
   }
 ): FlexMessage {
@@ -314,6 +315,7 @@ export function buildRouteDetailFlex(
       `distance=${debugInfo.selectedRouteDistanceKm ?? route.distanceKm} km`,
       `restaurantsAttempted=${debugInfo.restaurantSearchAttempted ? "yes" : "no"}`,
       `restaurantsFound=${debugInfo.restaurantsFound ?? 0}`,
+      `restaurantError=${debugInfo.restaurantError ?? "none"}`,
       `mapsKey=${debugInfo.googleMapsApiKeyConfigured ? "configured" : "missing"}`,
     ].join(" | ");
 

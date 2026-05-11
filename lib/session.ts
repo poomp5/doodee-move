@@ -43,9 +43,27 @@ export async function setSession(data: SessionData) {
     transitImageUrl,
     transitData,
   } = data;
+
+  // Build update object - only include pendingRoutes if explicitly provided
+  const updateData: any = {
+    step,
+    originLat,
+    originLng,
+    destLat,
+    destLng,
+    destLabel,
+    transitImageUrl,
+    transitData,
+  };
+
+  // Only include pendingRoutes in update if it's explicitly provided (not undefined)
+  if (pendingRoutes !== undefined) {
+    updateData.pendingRoutes = pendingRoutes;
+  }
+
   return prisma.userSession.upsert({
     where: { lineUserId },
-    update: { step, originLat, originLng, destLat, destLng, destLabel, pendingRoutes, transitImageUrl, transitData },
+    update: updateData,
     create: { lineUserId, step, originLat, originLng, destLat, destLng, destLabel, pendingRoutes, transitImageUrl, transitData },
   });
 }

@@ -38,6 +38,14 @@ export async function POST(req: NextRequest) {
   const signature = req.headers.get("x-line-signature") ?? "";
   const channelSecret = process.env.LINE_CHANNEL_SECRET;
 
+  console.log("[webhook] REQUEST RECEIVED", {
+    method: req.method,
+    url: req.url,
+    hasSignature: Boolean(signature),
+    bodyLength: body.length,
+    timestamp: new Date().toISOString(),
+  });
+
   if (!channelSecret) {
     console.error("[webhook] LINE_CHANNEL_SECRET is missing");
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
@@ -45,12 +53,17 @@ export async function POST(req: NextRequest) {
 
   const isValid = validateSignature(body, channelSecret, signature);
   if (!isValid) {
+    console.error("[webhook] Invalid signature");
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   let events: WebhookEvent[] = [];
   try {
     ({ events } = JSON.parse(body) as { events: WebhookEvent[] });
+    console.log("[webhook] PARSED EVENTS", {
+      eventCount: events.length,
+      eventTypes: events.map(e => e.type),
+    });
   } catch (error) {
     console.error("[webhook] Invalid JSON payload", error);
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
@@ -751,6 +764,14 @@ async function handlePostback(event: WebhookEvent) {
   const replyToken = event.replyToken;
   const data = event.postback?.data ?? "";
 
+  console.log("[webhook] POSTBACK EVENT RECEIVED", {
+    lineUserId,
+    data,
+    eventType: event.type,
+    hasReplyToken: Boolean(replyToken),
+    timestamp: new Date().toISOString(),
+  });
+
   // Handle PDPA consent acceptance
   if (data === "action=accept_pdpa") {
     try {
@@ -905,15 +926,44 @@ async function handlePostback(event: WebhookEvent) {
   if (data.startsWith("route=")) {
     const mode = data.slice("route=".length);
     const session = await getSession(lineUserId);
-    // reject postbacks unless we're actively awaiting a route; this also
-    // guards against a stale carousel clicking after the session has been
-    // cleared (old tokens/images) which was causing missing coordinates.
+    
+    console.log("[webhook] Route selection postback", {
+      lineUserId,
+      requestedMode: mode,
+      sessionExists: Boolean(session),
+      sessionStep: session?.step,
+      hasPendingRoutes: Boolean(session?.pendingRoutes),
+      pendingRouteCount: Array.isArray(session?.pendingRoutes) ? session.pendingRoutes.length : 0,
+    });
+
+    // reject postbacks unless we're actively awaiting a route
     if (!session || session.step !== "AWAITING_ROUTE" || !session.pendingRoutes) {
+      console.warn("[webhook] Route selection rejected: invalid session state", {
+        sessionExists: Boolean(session),
+        step: session?.step,
+        hasPendingRoutes: Boolean(session?.pendingRoutes),
+      });
+      await safeReply(replyToken, [{
+        type: "text",
+        text: `❌ เลือกเส้นทางไม่ได้ (session state: ${session?.step ?? "none"}). ลองใหม่หรือส่งตำแหน่งใหม่`,
+      }]);
       return;
     }
+    
     const routes: any[] = session.pendingRoutes as any[];
     const chosen = routes.find((r: any) => r.mode === mode);
-    if (!chosen) return;
+    
+    if (!chosen) {
+      console.warn("[webhook] Route selection failed: mode not found", {
+        requestedMode: mode,
+        availableModes: routes.map((r: any) => r.mode),
+      });
+      await safeReply(replyToken, [{
+        type: "text",
+        text: `❌ ไม่พบเส้นทาง "${mode}" ในตัวเลือกที่มี: ${routes.map((r: any) => r.mode).join(", ")}`,
+      }]);
+      return;
+    }
 
     const co2Saved = calcCo2Saved(chosen.distanceKm, chosen.mode);
 
@@ -921,20 +971,35 @@ async function handlePostback(event: WebhookEvent) {
       // Perform ALL database operations BEFORE replying to LINE
       const prisma = getPrisma();
 
-      console.log("[webhook] Starting database operations for route selection");
+      console.log("[webhook] Starting database operations for route selection", {
+        lineUserId,
+        chosenMode: chosen.mode,
+        hasCoordinates: Boolean(session.originLat && session.originLng && session.destLat && session.destLng),
+      });
+
+      // Test database connection
+      try {
+        await prisma.$queryRaw`SELECT 1`;
+        console.log("[webhook] Database connection OK");
+      } catch (dbError) {
+        console.error("[webhook] Database connection failed:", dbError);
+        throw new Error("Database connection failed");
+      }
 
       // Get user profile for display name
       let displayName = "ผู้ใช้";
       try {
         const profile = await lineClient.getProfile(lineUserId);
         displayName = profile.displayName;
-      } catch {
+      } catch (profileError) {
+        console.warn("[webhook] Profile fetch failed:", profileError);
         // ignore profile read error
       }
 
       // Ensure user exists
       let user = await prisma.user.findUnique({ where: { lineUserId } });
       if (!user) {
+        console.log("[webhook] Creating new user");
         user = await prisma.user.create({
           data: { lineUserId, displayName, pdpaConsent: true }
         });
@@ -949,6 +1014,15 @@ async function handlePostback(event: WebhookEvent) {
         session.destLat != null &&
         session.destLng != null
       ) {
+        console.log("[webhook] Creating trip record", {
+          originLat: session.originLat,
+          originLng: session.originLng,
+          destLat: session.destLat,
+          destLng: session.destLng,
+          mode: chosen.mode,
+          distanceKm: chosen.distanceKm,
+        });
+
         const trip = await prisma.trip.create({
           data: {
             user: { connect: { id: user.id } },
@@ -972,9 +1046,17 @@ async function handlePostback(event: WebhookEvent) {
           data: { totalCo2Saved: { increment: co2Saved } },
         });
         console.log("[webhook] Updated user CO2 saved");
+      } else {
+        console.warn("[webhook] Missing coordinates for trip creation", {
+          originLat: session.originLat,
+          originLng: session.originLng,
+          destLat: session.destLat,
+          destLng: session.destLng,
+        });
       }
 
       // Update session for feedback
+      console.log("[webhook] Updating session to AWAITING_ROUTE_FEEDBACK");
       await setSession({
         lineUserId,
         step: "AWAITING_ROUTE_FEEDBACK",
@@ -990,7 +1072,7 @@ async function handlePostback(event: WebhookEvent) {
           destLabel: session.destLabel ?? "",
         }),
       });
-      console.log("[webhook] Updated session for feedback");
+      console.log("[webhook] Session updated successfully");
 
       // Build flex messages
       const ratingFlex = buildRouteRatingFlex(chosen.mode, session.destLabel ?? "");
@@ -999,6 +1081,7 @@ async function handlePostback(event: WebhookEvent) {
       let restaurantsFlex: any = null;
       let restaurantSearchAttempted = false;
       let restaurantsFound = 0;
+      let restaurantError: string | null = null;
       try {
         if (session.destLat && session.destLng) {
           restaurantSearchAttempted = true;
@@ -1010,10 +1093,18 @@ async function handlePostback(event: WebhookEvent) {
             console.log(`[webhook] Found ${restaurants.length} restaurants`);
           } else {
             console.log("[webhook] No restaurants found");
+            restaurantError = "No restaurants found";
           }
+        } else {
+          console.warn("[webhook] No destination coordinates for restaurant search", {
+            destLat: session.destLat,
+            destLng: session.destLng,
+          });
+          restaurantError = "No destination coordinates";
         }
       } catch (err) {
         console.error("[webhook] Error fetching restaurants", err);
+        restaurantError = err instanceof Error ? err.message : String(err);
         // Continue without restaurant recommendations
       }
 
@@ -1028,6 +1119,7 @@ async function handlePostback(event: WebhookEvent) {
         selectedRouteDistanceKm: chosen.distanceKm,
         restaurantSearchAttempted,
         restaurantsFound,
+        restaurantError,
         googleMapsApiKeyConfigured: Boolean(process.env.GOOGLE_MAPS_API_KEY),
       });
 
@@ -1044,6 +1136,12 @@ async function handlePostback(event: WebhookEvent) {
 
     } catch (error) {
       console.error("[webhook] Route selection error:", error);
+      console.error("[webhook] Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        lineUserId,
+        chosenMode: chosen.mode,
+      });
       // Still try to reply to LINE even if database operations fail
       try {
         console.log("[webhook] Attempting fallback reply to LINE");
