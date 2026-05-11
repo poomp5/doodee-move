@@ -984,16 +984,19 @@ async function handlePostback(event: WebhookEvent) {
       console.log("[webhook] Updated session for feedback");
 
       // Build flex messages
-      const detailFlex = buildRouteDetailFlex(chosen, session.destLabel ?? "");
       const ratingFlex = buildRouteRatingFlex(chosen.mode, session.destLabel ?? "");
 
       // Fetch nearby restaurants at destination
       let restaurantsFlex: any = null;
+      let restaurantSearchAttempted = false;
+      let restaurantsFound = 0;
       try {
         if (session.destLat && session.destLng) {
+          restaurantSearchAttempted = true;
           console.log("[webhook] Fetching restaurants for destination:", session.destLat, session.destLng);
           const restaurants = await getNearbyRestaurants(session.destLat, session.destLng);
           if (restaurants && restaurants.length > 0) {
+            restaurantsFound = restaurants.length;
             restaurantsFlex = buildRestaurantsFlex(restaurants);
             console.log(`[webhook] Found ${restaurants.length} restaurants`);
           } else {
@@ -1007,8 +1010,20 @@ async function handlePostback(event: WebhookEvent) {
 
       console.log("[webhook] sending detail flex", { user: lineUserId, route: chosen.mode });
 
+      // Build route detail with debug metadata
+      const detailFlexWithDebug = buildRouteDetailFlex(chosen, session.destLabel ?? "", {
+        sessionStep: session.step,
+        sessionDestLat: session.destLat,
+        sessionDestLng: session.destLng,
+        selectedRouteMode: chosen.mode,
+        selectedRouteDistanceKm: chosen.distanceKm,
+        restaurantSearchAttempted,
+        restaurantsFound,
+        googleMapsApiKeyConfigured: Boolean(process.env.GOOGLE_MAPS_API_KEY),
+      });
+
       // Build reply messages - include restaurants if found
-      const replyMessages = [detailFlex, ratingFlex];
+      const replyMessages = [detailFlexWithDebug, ratingFlex];
       if (restaurantsFlex) {
         replyMessages.push(restaurantsFlex);
       }

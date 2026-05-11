@@ -240,7 +240,17 @@ export function buildRoutesFlexMessage(
 // optional static map image generated from the polyline if available.
 export function buildRouteDetailFlex(
   route: RouteResult,
-  destLabel: string
+  destLabel: string,
+  debugInfo?: {
+    sessionStep?: string;
+    sessionDestLat?: number | null;
+    sessionDestLng?: number | null;
+    selectedRouteMode?: string;
+    selectedRouteDistanceKm?: number;
+    restaurantSearchAttempted?: boolean;
+    restaurantsFound?: number;
+    googleMapsApiKeyConfigured?: boolean;
+  }
 ): FlexMessage {
   const co2SavedKg = (calcCo2Saved(route.distanceKm, route.mode) / 1000).toFixed(2);
   const primaryColor = "#2a9c64";
@@ -295,6 +305,27 @@ export function buildRouteDetailFlex(
     { type: "separator", margin: "md", color: "#e9e9e9" },
     ...stepTexts,
   ];
+
+  if (debugInfo) {
+    const debugText = [
+      `debug: step=${debugInfo.sessionStep ?? "unknown"}`,
+      `dest=${debugInfo.sessionDestLat ?? "?"},${debugInfo.sessionDestLng ?? "?"}`,
+      `route=${debugInfo.selectedRouteMode ?? route.mode}`,
+      `distance=${debugInfo.selectedRouteDistanceKm ?? route.distanceKm} km`,
+      `restaurantsAttempted=${debugInfo.restaurantSearchAttempted ? "yes" : "no"}`,
+      `restaurantsFound=${debugInfo.restaurantsFound ?? 0}`,
+      `mapsKey=${debugInfo.googleMapsApiKeyConfigured ? "configured" : "missing"}`,
+    ].join(" | ");
+
+    bodyContents.push({
+      type: "text",
+      text: debugText,
+      size: "xs",
+      color: "#999999",
+      wrap: true,
+      margin: "md",
+    });
+  }
 
   const bubble: any = {
     type: "bubble",
