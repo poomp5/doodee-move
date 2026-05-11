@@ -222,6 +222,16 @@ async function handleEvent(event: WebhookEvent) {
             transitImageUrl: session.transitImageUrl,
             transitData: session.transitData,
           } : null,
+          restaurantSystem: {
+            enabled: Boolean(process.env.GOOGLE_MAPS_API_KEY),
+            googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ? "configured" : "missing",
+            nearbySearchType: "restaurant",
+            requestRadiusMeters: 1500,
+            sessionHasDestination: Boolean(session?.destLat != null && session?.destLng != null),
+            sessionDestLat: session?.destLat ?? null,
+            sessionDestLng: session?.destLng ?? null,
+            sessionDestLabel: session?.destLabel ?? null,
+          },
           botVersion: BOT_VERSION,
           timestamp: new Date().toISOString(),
           environment: {
