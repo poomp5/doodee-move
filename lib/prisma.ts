@@ -9,14 +9,7 @@ const globalForPrisma = globalThis as GlobalForPrisma;
 
 function createPrismaClient(): PrismaClient {
   const adapter = new PrismaNeonHttp(process.env.DATABASE_URL!, {});
-  return new PrismaClient({
-    adapter,
-    // Disable transaction support for HTTP adapter
-    transactionOptions: {
-      maxWait: 1,
-      timeout: 0,
-    },
-  });
+  return new PrismaClient({ adapter });
 }
 
 export function getPrisma(): PrismaClient {
