@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateSignature } from "@line/bot-sdk";
 import { lineClient, lineBlobClient } from "@/lib/line";
 
-const BOT_VERSION = "1.4.3";
+const BOT_VERSION = "1.4.4";
 const SHOW_BOT_VERSION = false; // Toggle to show/hide bot version in messages
 
 // The LINE SDK doesn't expose webhook event types through its public API,
@@ -221,6 +221,8 @@ async function handleEvent(event: WebhookEvent) {
             destLabel: session.destLabel,
             transitImageUrl: session.transitImageUrl,
             transitData: session.transitData,
+            pendingRoutesCount: Array.isArray(session.pendingRoutes) ? session.pendingRoutes.length : null,
+            pendingRouteModes: Array.isArray(session.pendingRoutes) ? session.pendingRoutes.map((r: any) => r.mode).filter(Boolean) : null,
           } : null,
           restaurantSystem: {
             enabled: Boolean(process.env.GOOGLE_MAPS_API_KEY),
@@ -776,12 +778,19 @@ async function handlePostback(event: WebhookEvent) {
     return;
   }
 
+  const session = await getSession(lineUserId);
+  console.log("[webhook] postback received", {
+    lineUserId,
+    data,
+    sessionStep: session?.step,
+    hasPendingRoutes: Boolean(session?.pendingRoutes),
+  });
+
   // Handle rating submission after route selection
   if (data.startsWith("action=rate_route")) {
     try {
       const params = new URLSearchParams(data);
       const rating = parseInt(params.get("rating") || "0");
-      const session = await getSession(lineUserId);
       const feedbackContext = parsePendingFeedback(session?.transitData);
 
       if (rating < 1 || rating > 5 || !session || session.step !== "AWAITING_ROUTE_FEEDBACK" || !feedbackContext) {
