@@ -15,6 +15,7 @@ import { getSession, setSession, clearSession } from "@/lib/session";
 import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword, isInThailand, getNearbyRestaurants } from "@/lib/maps";
 import { calcCo2Saved } from "@/lib/carbon";
 import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex, buildRouteRatingFlex, buildRestaurantsFlex } from "@/lib/flex";
+import { recommendBestRoute } from "@/lib/typhoon";
 
 type PendingFeedbackData = {
   tripId?: string;
@@ -407,12 +408,11 @@ async function handleEvent(event: WebhookEvent) {
             pendingRoutes: routes,
           });
 
-          // send the flex carousel
+          // send Typhoon recommendation + flex carousel
           const flexMsg = buildRoutesFlexMessage(routes, destText) as any;
-          await safeReply(
-            replyToken,
-            [flexMsg]
-          );
+          const typhoonMsg = await buildTyphoonRecommendation(routes, originText, destText);
+          const replyMsgs = typhoonMsg ? [typhoonMsg, flexMsg] : [flexMsg];
+          await safeReply(replyToken, replyMsgs);
           return;
         } catch (err) {
           console.error("[webhook] text-based direction failed", err);
@@ -593,12 +593,11 @@ async function handleEvent(event: WebhookEvent) {
           pendingRoutes: routes,
         });
 
-        // send the flex carousel with actions; user will choose explicitly
+        // send Typhoon recommendation + flex carousel with actions
         const flexMsg = buildRoutesFlexMessage(routes, destLabel) as any;
-        await safeReply(
-          replyToken,
-          [flexMsg]
-        );
+        const typhoonMsg = await buildTyphoonRecommendation(routes, "ตำแหน่งปัจจุบัน", destLabel);
+        const replyMsgs = typhoonMsg ? [typhoonMsg, flexMsg] : [flexMsg];
+        await safeReply(replyToken, replyMsgs);
         return;
       }
 
@@ -701,12 +700,11 @@ async function handleEvent(event: WebhookEvent) {
         pendingRoutes: routes,
       });
 
-      // send the flex carousel with actions; user will choose explicitly
+      // send Typhoon recommendation + flex carousel with actions
       const flexMsg = buildRoutesFlexMessage(routes, destLabel) as any;
-      await safeReply(
-        replyToken,
-        [flexMsg]
-      );
+      const typhoonMsg = await buildTyphoonRecommendation(routes, "ตำแหน่งปัจจุบัน", destLabel);
+      const replyMsgs = typhoonMsg ? [typhoonMsg, flexMsg] : [flexMsg];
+      await safeReply(replyToken, replyMsgs);
       return;
     }
 
@@ -1034,5 +1032,25 @@ async function safeReply(
   } catch (error) {
     console.error("[webhook] LINE reply failed", error);
     // Don't attempt fallback - reply token expires quickly and can't be reused
+  }
+}
+
+/**
+ * สร้าง text message แนะนำเส้นทางโดย Typhoon
+ * ใช้ข้อมูลจริงจาก Google Maps เป็น context ห้าม hallucinate
+ * ถ้า Typhoon ล้มเหลว return null (ไม่ block การทำงาน)
+ */
+async function buildTyphoonRecommendation(
+  routes: import("@/lib/maps").RouteResult[],
+  originLabel: string,
+  destLabel: string
+): Promise<{ type: "text"; text: string } | null> {
+  try {
+    const recommendation = await recommendBestRoute(routes, originLabel, destLabel);
+    if (!recommendation) return null;
+    return { type: "text", text: `🤖 คำแนะนำ:\n${recommendation}` };
+  } catch (err) {
+    console.error("[typhoon] recommendBestRoute failed, skipping", err);
+    return null;
   }
 }
