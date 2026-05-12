@@ -957,6 +957,32 @@ async function handlePostback(event: WebhookEvent) {
     return;
   }
 
+  // Handle restaurant navigation button fallback for legacy postbacks
+  if (data.startsWith("action=navigate_restaurant")) {
+    const params = new URLSearchParams(data);
+    const lat = params.get("lat");
+    const lng = params.get("lng");
+    const name = params.get("name") || "ร้านอาหารใกล้เคียง";
+
+    if (lat && lng) {
+      const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${lat},${lng}`)}${params.get("placeId") ? `&destination_place_id=${encodeURIComponent(params.get("placeId")!)}` : ""}`;
+      await safeReply(replyToken, [
+        {
+          type: "text",
+          text: `กดที่ลิงก์นี้เพื่อดูเส้นทางไปยัง ${decodeURIComponent(name)}:\n${mapsUrl}`,
+        },
+      ]);
+    } else {
+      await safeReply(replyToken, [
+        {
+          type: "text",
+          text: "ไม่สามารถเปิดแผนที่ร้านอาหารได้ เนื่องจากขาดข้อมูลตำแหน่ง ลองใหม่อีกครั้งนะ",
+        },
+      ]);
+    }
+    return;
+  }
+
   // Handle train station confirmation
   if (data === "action=confirm_station") {
     const session = await getSession(lineUserId);

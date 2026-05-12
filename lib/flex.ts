@@ -910,9 +910,9 @@ export function buildRestaurantsFlex(restaurants: RestaurantResult[]): FlexMessa
           {
             type: "button",
             action: {
-              type: "postback",
+              type: "uri",
               label: "🗺️ นำทาง",
-              data: `action=navigate_restaurant&lat=${restaurant.lat}&lng=${restaurant.lng}&name=${encodeURIComponent(restaurant.name)}`,
+              uri: `https://www.google.com/maps/dir/?api=1&destination=${restaurant.lat},${restaurant.lng}${restaurant.placeId ? `&destination_place_id=${encodeURIComponent(restaurant.placeId)}` : ""}`,
             },
             style: "primary",
             color: primaryColor,
