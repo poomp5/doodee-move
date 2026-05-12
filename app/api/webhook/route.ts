@@ -417,28 +417,40 @@ async function handleEvent(event: WebhookEvent) {
         try {
           await showTyping(lineUserId, 15);
           let originLat: number, originLng: number;
+          let destGeocodedLat: number, destGeocodedLng: number;
 
           if (intent.type === "origin_and_destination") {
-            const originGeocode = await geocodePlace(intent.origin);
+            // geocode origin+dest parallel
+            const [originGeocode, destGeocode] = await Promise.all([
+              geocodePlace(intent.origin),
+              geocodePlace(destText),
+            ]);
             if (!originGeocode) {
               await safeReply(replyToken, [{ type: "text", text: `ไม่พบสถานที่ต้นทาง "${intent.origin}" ลองพิมพ์ใหม่หรือส่งตำแหน่งต้นทางแทนนะ` }]);
               return;
             }
+            if (!destGeocode) {
+              await safeReply(replyToken, [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่งตำแหน่งปลายทางแทนนะ` }]);
+              return;
+            }
             originLat = originGeocode.lat;
             originLng = originGeocode.lng;
+            destGeocodedLat = destGeocode.lat;
+            destGeocodedLng = destGeocode.lng;
           } else {
             // destination_only + มี session origin
             originLat = session!.originLat!;
             originLng = session!.originLng!;
+            const destGeocode = await geocodePlace(destText);
+            if (!destGeocode) {
+              await safeReply(replyToken, [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่งตำแหน่งปลายทางแทนนะ` }]);
+              return;
+            }
+            destGeocodedLat = destGeocode.lat;
+            destGeocodedLng = destGeocode.lng;
           }
 
-          const destGeocode = await geocodePlace(destText);
-          if (!destGeocode) {
-            await safeReply(replyToken, [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่งตำแหน่งปลายทางแทนนะ` }]);
-            return;
-          }
-
-          const routes = await getRoutes(originLat, originLng, destGeocode.lat, destGeocode.lng);
+          const routes = await getRoutes(originLat, originLng, destGeocodedLat, destGeocodedLng);
           if (routes.length === 0) {
             await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบเส้นทางขนส่งสาธารณะหรือทางเลือกสีเขียวในพื้นที่นี้" }]);
             return;
@@ -449,8 +461,8 @@ async function handleEvent(event: WebhookEvent) {
             step: "AWAITING_ROUTE",
             originLat,
             originLng,
-            destLat: destGeocode.lat,
-            destLng: destGeocode.lng,
+            destLat: destGeocodedLat,
+            destLng: destGeocodedLng,
             destLabel: destText,
             pendingRoutes: routes,
           });
@@ -1017,7 +1029,7 @@ async function handlePostback(event: WebhookEvent) {
       });
       await safeReply(replyToken, [{
         type: "text",
-        text: `❌ เลือกเส้นทางไม่ได้ (session state: ${session?.step ?? "none"}). ลองใหม่หรือส่งตำแหน่งใหม่`,
+        text: "การเลือกเส้นทางหมดอายุแล้ว\n\nส่งตำแหน่งปัจจุบันมาใหม่ได้เลย แล้วน้องจะหาเส้นทางให้ใหม่อีกครั้ง 🙏",
       }]);
       return;
     }
