@@ -227,24 +227,28 @@ export async function chatWithDoodee(
   userMessage: string,
   context: ChatContext
 ): Promise<string> {
+  const name = context.displayName ?? "เพื่อน";
+
   const contextLines: string[] = [];
-  if (context.displayName) contextLines.push(`- ชื่อผู้ใช้: ${context.displayName}`);
   if (context.sessionStep && context.sessionStep !== "IDLE") {
     contextLines.push(`- สถานะปัจจุบัน: ${context.sessionStep}`);
   }
   if (context.destLabel) contextLines.push(`- ปลายทางที่บอกไว้: ${context.destLabel}`);
   const contextText = contextLines.length > 0 ? `\nข้อมูล context:\n${contextLines.join("\n")}` : "";
 
-  return callTyphoon(
+  const reply = await callTyphoon(
     [
       {
         role: "system",
         content: `คุณคือ "น้องดูดี" ผู้ช่วยนำทางของแอป Doodee Move ในประเทศไทย
 บุคลิก: เป็นกันเอง ใจดี พูดภาษาไทยเป็นธรรมชาติ ไม่ formal เกินไป
 
+ชื่อผู้ใช้ที่คุยด้วยคือ "${name}" — ใช้ชื่อนี้ทักทายในประโยคแรกเสมอ ห้ามเรียกชื่ออื่น
+
 หน้าที่หลัก: ช่วยผู้ใช้วางแผนการเดินทางด้วยขนส่งสาธารณะในไทย (BTS, MRT, รถเมล์, ฯลฯ)
 
 กฎสำคัญ:
+- ทักทายด้วยชื่อ "${name}" ในประโยคแรกเสมอ
 - ถ้า user บอกปลายทาง ให้ถามที่อยู่ปัจจุบัน หรือแนะนำให้ส่ง location
 - ถ้า user ถามเรื่องเส้นทาง ให้บอกว่า "ส่งตำแหน่งปัจจุบันมาได้เลย แล้วน้องจะหาให้"
 - ห้าม hallucinate เส้นทาง ราคา หรือเวลา — บอกได้แค่ว่าต้องการ location ก่อนถึงจะหาให้ได้
@@ -258,4 +262,10 @@ export async function chatWithDoodee(
     ],
     300
   );
+
+  // ถ้า Typhoon ไม่ได้ใช้ชื่อใน reply → prepend เองให้แน่ใจ
+  if (name !== "เพื่อน" && !reply.includes(name)) {
+    return `สวัสดี${name}! ${reply}`;
+  }
+  return reply;
 }
