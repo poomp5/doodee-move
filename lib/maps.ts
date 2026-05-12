@@ -389,14 +389,19 @@ export async function getNearbyRestaurants(
   lng: number,
   radiusMeters: number = 1500
 ): Promise<RestaurantResult[]> {
-  const key = process.env.GOOGLE_MAPS_API_KEY!;
+  const key = process.env.GOOGLE_MAPS_API_KEY;
   const restaurants: RestaurantResult[] = [];
 
-  try {
+  if (!key) {
+    console.warn("[getNearbyRestaurants] Missing GOOGLE_MAPS_API_KEY");
+    return restaurants;
+  }
+
+  async function fetchNearby(radius: number) {
     const res = await mapsClient.placesNearby({
       params: {
         location: { lat, lng },
-        radius: radiusMeters,
+        radius,
         type: "restaurant",
         language: Language.th,
         key,
@@ -438,8 +443,21 @@ export async function getNearbyRestaurants(
         });
       }
     }
+  }
+
+  try {
+    await fetchNearby(radiusMeters);
   } catch (err) {
     console.error("[getNearbyRestaurants] Error fetching restaurants:", err);
+  }
+
+  if (restaurants.length === 0 && radiusMeters < 3000) {
+    try {
+      console.log("[getNearbyRestaurants] No restaurants found within initial radius, expanding search to 3000m");
+      await fetchNearby(3000);
+    } catch (err) {
+      console.error("[getNearbyRestaurants] Error fetching restaurants on fallback radius:", err);
+    }
   }
 
   // Sort by rating (descending), then by distance (ascending)

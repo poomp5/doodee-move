@@ -1237,6 +1237,11 @@ async function handlePostback(event: WebhookEvent) {
       const replyMessages = [detailFlexWithDebug, ratingFlex];
       if (restaurantsFlex) {
         replyMessages.push(restaurantsFlex);
+      } else if (restaurantSearchAttempted) {
+        replyMessages.push({
+          type: "text",
+          text: "ไม่พบร้านอาหารใกล้ปลายทางในขณะนี้",
+        });
       }
 
       // Reply to LINE AFTER all database work is complete
