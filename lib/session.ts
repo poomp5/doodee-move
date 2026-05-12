@@ -3,6 +3,7 @@ import { getPrisma } from "./prisma";
 export type SessionStep =
   | "IDLE"
   | "WAITING_DESTINATION"
+  | "WAITING_ORIGIN_FOR_DEST"  // user บอกปลายทางแล้ว รอรับ location ต้นทาง
   | "AWAITING_ROUTE"
   | "WAITING_FOR_LOCATION_FOR_STATION"
   | "FOUND_TRAIN_STATION"

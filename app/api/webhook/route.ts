@@ -393,12 +393,12 @@ async function handleEvent(event: WebhookEvent) {
       if (intent.type === "origin_and_destination" || intent.type === "destination_only") {
         const destText = intent.destination;
 
-        // destination_only: ถ้ามี session origin ใช้ได้เลย ถ้าไม่มีต้องถาม
+        // destination_only: ถ้ามี session origin ใช้ได้เลย ถ้าไม่มีต้องขอ location ก่อน
         if (intent.type === "destination_only" && !session?.originLat) {
-          await setSession({ lineUserId, step: "WAITING_DESTINATION", destLabel: destText });
+          await setSession({ lineUserId, step: "WAITING_ORIGIN_FOR_DEST", destLabel: destText });
           await safeReply(replyToken, [{
             type: "text",
-            text: `📍 ส่งตำแหน่งปัจจุบันของคุณมาก่อนนะ แล้วจะพาไป${destText} เลย`,
+            text: `คุณต้องการไป ${destText} ใช่ไหม?\n\nส่งตำแหน่งปัจจุบันมาเลย แล้วจะหาเส้นทางให้ทันที`,
           }]);
           return;
         }
@@ -543,6 +543,54 @@ async function handleEvent(event: WebhookEvent) {
           text: "ขออภัย ปัจจุบัน Doodee Move ให้บริการเฉพาะภายในประเทศไทยเท่านั้น 🇹🇭\n\nกรุณาส่งตำแหน่งที่อยู่ในประเทศไทย",
         }]);
         return;
+      }
+
+      // Handle WAITING_ORIGIN_FOR_DEST — user บอกปลายทางไว้แล้ว ส่ง location มาเป็นต้นทาง
+      if (session?.step === "WAITING_ORIGIN_FOR_DEST") {
+        const savedDestLabel = session.destLabel;
+        if (!savedDestLabel) {
+          await clearSession(lineUserId);
+          await safeReply(replyToken, [{ type: "text", text: "ขออภัย เกิดข้อผิดพลาด ลองพิมพ์ปลายทางใหม่อีกครั้งนะ" }]);
+          return;
+        }
+
+        try {
+          const destGeocode = await geocodePlace(savedDestLabel);
+          if (!destGeocode) {
+            await clearSession(lineUserId);
+            await safeReply(replyToken, [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${savedDestLabel}" ลองพิมพ์ใหม่อีกครั้งนะ` }]);
+            return;
+          }
+
+          const routes = await getRoutes(incomingLat, incomingLng, destGeocode.lat, destGeocode.lng);
+          if (routes.length === 0) {
+            await clearSession(lineUserId);
+            await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบเส้นทางขนส่งสาธารณะหรือทางเลือกสีเขียวในพื้นที่นี้" }]);
+            return;
+          }
+
+          await setSession({
+            lineUserId,
+            step: "AWAITING_ROUTE",
+            originLat: incomingLat,
+            originLng: incomingLng,
+            destLat: destGeocode.lat,
+            destLng: destGeocode.lng,
+            destLabel: savedDestLabel,
+            pendingRoutes: routes,
+          });
+
+          const flexMsg = buildRoutesFlexMessage(routes, savedDestLabel) as any;
+          const typhoonMsg = await buildTyphoonRecommendation(routes, "ตำแหน่งปัจจุบัน", savedDestLabel);
+          const replyMsgs = typhoonMsg ? [typhoonMsg, flexMsg] : [flexMsg];
+          await safeReply(replyToken, replyMsgs);
+          return;
+        } catch (err) {
+          console.error("[webhook] WAITING_ORIGIN_FOR_DEST route lookup failed", err);
+          await clearSession(lineUserId);
+          await safeReply(replyToken, [{ type: "text", text: "เกิดข้อผิดพลาดในการค้นหาเส้นทาง ลองใหม่อีกครั้งนะ" }]);
+          return;
+        }
       }
 
       // Handle WAITING_FOR_LOCATION_FOR_STATION
