@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import liff from "@line/liff";
 
-type Step = "loading" | "login_prompt" | "name_input" | "camera" | "submitting" | "done" | "error";
+type Step = "loading" | "login_prompt" | "name_input" | "ready" | "submitting" | "done" | "error";
+
+const GREEN = "#2a9c64";
 
 export default function LiffSubmitPage() {
   const [step, setStep] = useState<Step>("loading");
   const [lineUserId, setLineUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [nameInput, setNameInput] = useState("");
-  const [photo, setPhoto] = useState<string | null>(null); // base64
+  const [photo, setPhoto] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState("");
   const [description, setDescription] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -19,33 +21,34 @@ export default function LiffSubmitPage() {
   useEffect(() => {
     const liffId = process.env.NEXT_PUBLIC_LIFF_APP_ID;
     if (!liffId) {
-      setErrorMsg("LIFF_APP_ID ไม่ได้ตั้งค่า");
-      setStep("error");
+      // ไม่มี LIFF ID → ข้าม LINE login ไปเลย
+      setStep("login_prompt");
       return;
     }
 
-    liff
-      .init({ liffId })
-      .then(() => {
-        if (liff.isLoggedIn()) {
-          return liff.getProfile().then((profile) => {
-            setLineUserId(profile.userId);
-            setDisplayName(profile.displayName);
-            setStep("camera");
-          });
-        } else {
+    import("@line/liff").then(({ default: liff }) => {
+      liff
+        .init({ liffId })
+        .then(() => {
+          if (liff.isLoggedIn()) {
+            return liff.getProfile().then((profile) => {
+              setLineUserId(profile.userId);
+              setDisplayName(profile.displayName);
+              setStep("ready");
+            });
+          } else {
+            setStep("login_prompt");
+          }
+        })
+        .catch(() => {
+          // เปิดนอก LINE app → ข้าม login ไปเลย ไม่ error
           setStep("login_prompt");
-        }
-      })
-      .catch((err) => {
-        console.error("LIFF init failed", err);
-        setErrorMsg("เปิด LIFF ไม่ได้ ลองใหม่อีกครั้ง");
-        setStep("error");
-      });
+        });
+    });
   }, []);
 
   function handleLoginWithLine() {
-    liff.login();
+    import("@line/liff").then(({ default: liff }) => liff.login());
   }
 
   function handleSkipLogin() {
@@ -56,35 +59,34 @@ export default function LiffSubmitPage() {
     const name = nameInput.trim();
     if (!name) return;
     setDisplayName(name);
-    setStep("camera");
+    setStep("ready");
   }
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = () => {
       const base64 = (reader.result as string).split(",")[1];
       setPhoto(base64);
     };
     reader.readAsDataURL(file);
+  }
 
-    // ขอ location พร้อมกัน
+  function handleRequestLocation() {
+    setLocationError("");
     navigator.geolocation.getCurrentPosition(
       (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      (err) => console.warn("Location denied", err),
-      { enableHighAccuracy: true, timeout: 10000 }
+      (err) => {
+        console.warn("Location error", err);
+        setLocationError("ไม่สามารถรับตำแหน่งได้ กรุณาอนุญาต Location ในการตั้งค่าเบราว์เซอร์");
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
     );
   }
 
   async function handleSubmit() {
-    if (!photo) return;
-    if (!location) {
-      setErrorMsg("ไม่ได้รับตำแหน่ง กรุณาอนุญาต location แล้วลองใหม่");
-      return;
-    }
-
+    if (!photo || !location) return;
     setStep("submitting");
     try {
       const res = await fetch("/api/liff/submit", {
@@ -99,7 +101,6 @@ export default function LiffSubmitPage() {
           description: description.trim() || "ส่งจาก LIFF",
         }),
       });
-
       if (!res.ok) throw new Error(await res.text());
       setStep("done");
     } catch (err) {
@@ -109,262 +110,254 @@ export default function LiffSubmitPage() {
     }
   }
 
-  function handleRetry() {
-    setStep("camera");
-    setPhoto(null);
-    setLocation(null);
-    setDescription("");
-    setErrorMsg("");
+  async function handleClose() {
+    try {
+      const { default: liff } = await import("@line/liff");
+      if (liff.isInClient()) {
+        liff.closeWindow();
+        return;
+      }
+    } catch {}
+    window.close();
   }
 
   // --- UI ---
-  const green = "#2a9c64";
 
   if (step === "loading") {
     return (
-      <div style={styles.center}>
-        <div style={{ ...styles.spinner, borderTopColor: green }} />
-        <p style={styles.subtext}>กำลังโหลด...</p>
-      </div>
+      <Center>
+        <Spinner />
+        <Sub>กำลังโหลด...</Sub>
+      </Center>
     );
   }
 
   if (step === "login_prompt") {
     return (
-      <div style={styles.container}>
-        <div style={{ ...styles.iconCircle, background: green }}>🗺️</div>
-        <h1 style={styles.title}>สร้างแผนที่ขนส่ง</h1>
-        <p style={styles.body}>ช่วยเพิ่มข้อมูลยานพาหนะในพื้นที่ของคุณ<br />เพื่อให้คนอื่นเดินทางได้ง่ายขึ้น</p>
-        <button style={{ ...styles.btnPrimary, background: "#06C755" }} onClick={handleLoginWithLine}>
-          เข้าสู่ระบบด้วย LINE
-        </button>
-        <button style={styles.btnSecondary} onClick={handleSkipLogin}>
-          ไม่ต้องการ Login
-        </button>
-      </div>
+      <Container>
+        <Icon>🗺️</Icon>
+        <Title>สร้างแผนที่ขนส่ง</Title>
+        <Body>ช่วยเพิ่มข้อมูลยานพาหนะในพื้นที่ของคุณ<br />เพื่อให้คนอื่นเดินทางได้ง่ายขึ้น</Body>
+        <Btn color="#06C755" onClick={handleLoginWithLine}>เข้าสู่ระบบด้วย LINE</Btn>
+        <BtnOutline onClick={handleSkipLogin}>ไม่ต้องการ Login</BtnOutline>
+      </Container>
     );
   }
 
   if (step === "name_input") {
     return (
-      <div style={styles.container}>
-        <div style={{ ...styles.iconCircle, background: green }}>👋</div>
-        <h1 style={styles.title}>ชื่อของคุณ</h1>
-        <p style={styles.body}>ใส่ชื่อเล่นหรือชื่อที่ต้องการให้แสดง</p>
+      <Container>
+        <Icon>👋</Icon>
+        <Title>ชื่อของคุณ</Title>
+        <Body>ใส่ชื่อเล่นหรือชื่อที่ต้องการให้แสดง</Body>
         <input
-          style={styles.input}
+          style={S.input}
           placeholder="เช่น น้องดูดี"
           value={nameInput}
           onChange={(e) => setNameInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
           autoFocus
         />
-        <button
-          style={{ ...styles.btnPrimary, background: nameInput.trim() ? green : "#ccc" }}
-          onClick={handleNameSubmit}
-          disabled={!nameInput.trim()}
-        >
+        <Btn color={nameInput.trim() ? GREEN : "#ccc"} onClick={handleNameSubmit} disabled={!nameInput.trim()}>
           ถัดไป
-        </button>
-      </div>
+        </Btn>
+      </Container>
     );
   }
 
-  if (step === "camera") {
+  if (step === "ready") {
+    const canSubmit = !!photo && !!location;
     return (
-      <div style={styles.container}>
-        <div style={{ ...styles.iconCircle, background: green }}>📸</div>
-        <h1 style={styles.title}>สวัสดี {displayName}!</h1>
-        <p style={styles.body}>ถ่ายรูปยานพาหนะ (รถสองแถว, รถเมล์, รถตู้)<br />ให้เห็นป้ายหมายเลขชัดเจน</p>
+      <Container>
+        <Title>สวัสดี {displayName || "เพื่อน"}! 👋</Title>
+        <Body>ถ่ายรูปยานพาหนะ แล้วส่งตำแหน่ง</Body>
 
-        {photo ? (
-          <div style={{ margin: "12px 0", textAlign: "center" }}>
-            <img
-              src={`data:image/jpeg;base64,${photo}`}
-              alt="preview"
-              style={{ width: "100%", maxWidth: 320, borderRadius: 12, objectFit: "cover" }}
-            />
-            <button style={styles.btnSecondary} onClick={() => setPhoto(null)}>ถ่ายใหม่</button>
-          </div>
-        ) : (
-          <>
-            <button style={{ ...styles.btnPrimary, background: green }} onClick={() => fileRef.current?.click()}>
-              📷 เปิดกล้องถ่ายรูป
-            </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              style={{ display: "none" }}
-              onChange={handlePhotoChange}
-            />
-          </>
-        )}
+        {/* Photo section */}
+        <Section>
+          <Label>📸 รูปยานพาหนะ</Label>
+          {photo ? (
+            <>
+              <img
+                src={`data:image/jpeg;base64,${photo}`}
+                alt="preview"
+                style={{ width: "100%", maxWidth: 320, borderRadius: 12, objectFit: "cover" }}
+              />
+              <BtnOutline onClick={() => { setPhoto(null); fileRef.current && (fileRef.current.value = ""); }}>
+                ถ่ายใหม่
+              </BtnOutline>
+            </>
+          ) : (
+            <>
+              <Btn color={GREEN} onClick={() => fileRef.current?.click()}>📷 เปิดกล้อง</Btn>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                style={{ display: "none" }}
+                onChange={handlePhotoChange}
+              />
+            </>
+          )}
+        </Section>
 
-        {photo && (
-          <>
-            <textarea
-              style={styles.textarea}
-              placeholder="อธิบายเพิ่มเติม เช่น 'รถสองแถวหน้าตลาด ราคา 10 บาท'"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-            {location ? (
-              <p style={{ color: green, fontSize: 13, margin: "4px 0 12px" }}>
-                ✅ รับตำแหน่งแล้ว ({location.lat.toFixed(4)}, {location.lng.toFixed(4)})
-              </p>
-            ) : (
-              <p style={{ color: "#f59e0b", fontSize: 13, margin: "4px 0 12px" }}>
-                ⏳ กำลังรับตำแหน่ง...
-              </p>
-            )}
-            <button
-              style={{ ...styles.btnPrimary, background: location ? green : "#ccc" }}
-              onClick={handleSubmit}
-              disabled={!location}
-            >
-              ส่งข้อมูล
-            </button>
-          </>
-        )}
-      </div>
+        {/* Location section */}
+        <Section>
+          <Label>📍 ตำแหน่ง</Label>
+          {location ? (
+            <StatusGood>✅ รับตำแหน่งแล้ว ({location.lat.toFixed(4)}, {location.lng.toFixed(4)})</StatusGood>
+          ) : (
+            <>
+              <Btn color="#3b82f6" onClick={handleRequestLocation}>อนุญาตตำแหน่ง</Btn>
+              {locationError && <StatusBad>{locationError}</StatusBad>}
+            </>
+          )}
+        </Section>
+
+        {/* Description */}
+        <Section>
+          <Label>📝 รายละเอียด (ไม่บังคับ)</Label>
+          <textarea
+            style={S.textarea}
+            placeholder="เช่น รถสองแถวหน้าตลาด ราคา 10 บาท"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+          />
+        </Section>
+
+        <Btn color={canSubmit ? GREEN : "#ccc"} onClick={handleSubmit} disabled={!canSubmit}>
+          ส่งข้อมูล
+        </Btn>
+      </Container>
     );
   }
 
   if (step === "submitting") {
     return (
-      <div style={styles.center}>
-        <div style={{ ...styles.spinner, borderTopColor: green }} />
-        <p style={styles.subtext}>กำลังส่งข้อมูล...</p>
-      </div>
+      <Center>
+        <Spinner />
+        <Sub>กำลังส่งข้อมูล...</Sub>
+      </Center>
     );
   }
 
   if (step === "done") {
     return (
-      <div style={styles.container}>
-        <div style={{ ...styles.iconCircle, background: green, fontSize: 40 }}>✅</div>
-        <h1 style={styles.title}>ขอบคุณมาก!</h1>
-        <p style={styles.body}>ข้อมูลของคุณถูกส่งให้ทีมงานแล้ว<br />จะนำไปสร้างแผนที่ขนส่งให้ทุกคนใช้ได้</p>
-        <button style={{ ...styles.btnPrimary, background: green }} onClick={() => liff.closeWindow()}>
-          ปิดหน้าต่าง
-        </button>
-      </div>
+      <Container>
+        <Icon style={{ background: GREEN }}>✅</Icon>
+        <Title>ขอบคุณมาก!</Title>
+        <Body>ข้อมูลถูกส่งให้ทีมงานแล้ว<br />จะนำไปสร้างแผนที่ขนส่งให้ทุกคนใช้ได้</Body>
+        <Btn color={GREEN} onClick={handleClose}>ปิดหน้าต่าง</Btn>
+      </Container>
     );
   }
 
   // error
   return (
-    <div style={styles.container}>
-      <div style={{ ...styles.iconCircle, background: "#ef4444", fontSize: 40 }}>❌</div>
-      <h1 style={styles.title}>เกิดข้อผิดพลาด</h1>
-      <p style={styles.body}>{errorMsg}</p>
-      <button style={{ ...styles.btnPrimary, background: green }} onClick={handleRetry}>
-        ลองใหม่
-      </button>
-    </div>
+    <Container>
+      <Icon style={{ background: "#ef4444" }}>❌</Icon>
+      <Title>เกิดข้อผิดพลาด</Title>
+      <Body>{errorMsg}</Body>
+      <Btn color={GREEN} onClick={() => { setStep("ready"); setErrorMsg(""); }}>ลองใหม่</Btn>
+    </Container>
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+// --- tiny components ---
+
+function Container({ children }: { children: React.ReactNode }) {
+  return <div style={S.container}>{children}</div>;
+}
+function Center({ children }: { children: React.ReactNode }) {
+  return <div style={S.center}>{children}</div>;
+}
+function Icon({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return <div style={{ ...S.icon, ...style }}>{children}</div>;
+}
+function Title({ children }: { children: React.ReactNode }) {
+  return <h1 style={S.title}>{children}</h1>;
+}
+function Body({ children }: { children: React.ReactNode }) {
+  return <p style={S.body}>{children}</p>;
+}
+function Sub({ children }: { children: React.ReactNode }) {
+  return <p style={S.sub}>{children}</p>;
+}
+function Label({ children }: { children: React.ReactNode }) {
+  return <p style={S.label}>{children}</p>;
+}
+function Section({ children }: { children: React.ReactNode }) {
+  return <div style={S.section}>{children}</div>;
+}
+function StatusGood({ children }: { children: React.ReactNode }) {
+  return <p style={{ color: GREEN, fontSize: 13, margin: "4px 0" }}>{children}</p>;
+}
+function StatusBad({ children }: { children: React.ReactNode }) {
+  return <p style={{ color: "#ef4444", fontSize: 13, margin: "4px 0" }}>{children}</p>;
+}
+function Btn({ children, color, onClick, disabled }: { children: React.ReactNode; color: string; onClick?: () => void; disabled?: boolean }) {
+  return (
+    <button style={{ ...S.btn, background: color, cursor: disabled ? "not-allowed" : "pointer" }} onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  );
+}
+function BtnOutline({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
+  return <button style={S.btnOutline} onClick={onClick}>{children}</button>;
+}
+function Spinner() {
+  return <div style={S.spinner} />;
+}
+
+const S: Record<string, React.CSSProperties> = {
   container: {
-    minHeight: "100dvh",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "24px 20px",
+    minHeight: "100dvh", display: "flex", flexDirection: "column",
+    alignItems: "center", padding: "24px 20px",
     fontFamily: "'Noto Sans Thai', sans-serif",
-    background: "#f8faf9",
-    gap: 12,
-    textAlign: "center",
+    background: "#f8faf9", gap: 12, textAlign: "center",
+    paddingTop: 40,
   },
   center: {
-    minHeight: "100dvh",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-    background: "#f8faf9",
+    minHeight: "100dvh", display: "flex", flexDirection: "column",
+    alignItems: "center", justifyContent: "center",
+    gap: 16, background: "#f8faf9",
   },
-  iconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: 32,
-    marginBottom: 8,
+  icon: {
+    width: 72, height: 72, borderRadius: "50%",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 32, background: GREEN, marginBottom: 8,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 700,
-    color: "#1a1a1a",
-    margin: 0,
+  title: { fontSize: 22, fontWeight: 700, color: "#1a1a1a", margin: 0 },
+  body: { fontSize: 15, color: "#555", lineHeight: 1.6, margin: 0 },
+  sub: { fontSize: 14, color: "#888" },
+  label: { fontSize: 13, color: "#888", margin: "0 0 6px", textAlign: "left", width: "100%", maxWidth: 320 },
+  section: { width: "100%", maxWidth: 320, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 },
+  btn: {
+    width: "100%", maxWidth: 320, padding: "14px 0",
+    borderRadius: 12, border: "none", color: "#fff",
+    fontSize: 16, fontWeight: 600,
   },
-  body: {
-    fontSize: 15,
-    color: "#555",
-    lineHeight: 1.6,
-    margin: 0,
-  },
-  subtext: {
-    fontSize: 14,
-    color: "#888",
-  },
-  btnPrimary: {
-    width: "100%",
-    maxWidth: 320,
-    padding: "14px 0",
-    borderRadius: 12,
-    border: "none",
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  btnSecondary: {
-    width: "100%",
-    maxWidth: 320,
-    padding: "12px 0",
-    borderRadius: 12,
-    border: "1.5px solid #ddd",
-    background: "#fff",
-    color: "#555",
-    fontSize: 15,
-    cursor: "pointer",
-    marginTop: 4,
+  btnOutline: {
+    width: "100%", maxWidth: 320, padding: "12px 0",
+    borderRadius: 12, border: "1.5px solid #ddd",
+    background: "#fff", color: "#555", fontSize: 15, cursor: "pointer",
   },
   input: {
-    width: "100%",
-    maxWidth: 320,
-    padding: "12px 14px",
-    borderRadius: 10,
-    border: "1.5px solid #ddd",
-    fontSize: 16,
-    outline: "none",
-    boxSizing: "border-box",
+    width: "100%", maxWidth: 320, padding: "12px 14px",
+    borderRadius: 10, border: "1.5px solid #ddd",
+    fontSize: 16, outline: "none", boxSizing: "border-box",
   },
   textarea: {
-    width: "100%",
-    maxWidth: 320,
-    padding: "12px 14px",
-    borderRadius: 10,
-    border: "1.5px solid #ddd",
-    fontSize: 14,
-    outline: "none",
-    resize: "none",
-    boxSizing: "border-box",
-    fontFamily: "inherit",
+    width: "100%", maxWidth: 320, padding: "12px 14px",
+    borderRadius: 10, border: "1.5px solid #ddd",
+    fontSize: 14, outline: "none", resize: "none",
+    boxSizing: "border-box", fontFamily: "inherit",
   },
   spinner: {
-    width: 40,
-    height: 40,
+    width: 40, height: 40,
     border: "4px solid #e5e7eb",
+    borderTop: `4px solid ${GREEN}`,
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
