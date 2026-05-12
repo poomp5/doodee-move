@@ -1,5 +1,11 @@
 import type { RouteResult } from "./maps";
 
+export type ChatContext = {
+  displayName?: string;
+  sessionStep?: string;
+  destLabel?: string;
+};
+
 const TYPHOON_BASE_URL = "https://api.opentyphoon.ai/v1";
 
 type TyphoonMessage = {
@@ -211,4 +217,45 @@ ${routeSummaries}
   ]);
 
   return recommendation;
+}
+
+/**
+ * Conversational chat สำหรับ "คุยกับน้องดูดี"
+ * ตอบแบบเป็นธรรมชาติ เข้าใจ intent ของ user และ guide ไปหาเส้นทาง
+ */
+export async function chatWithDoodee(
+  userMessage: string,
+  context: ChatContext
+): Promise<string> {
+  const contextLines: string[] = [];
+  if (context.displayName) contextLines.push(`- ชื่อผู้ใช้: ${context.displayName}`);
+  if (context.sessionStep && context.sessionStep !== "IDLE") {
+    contextLines.push(`- สถานะปัจจุบัน: ${context.sessionStep}`);
+  }
+  if (context.destLabel) contextLines.push(`- ปลายทางที่บอกไว้: ${context.destLabel}`);
+  const contextText = contextLines.length > 0 ? `\nข้อมูล context:\n${contextLines.join("\n")}` : "";
+
+  return callTyphoon(
+    [
+      {
+        role: "system",
+        content: `คุณคือ "น้องดูดี" ผู้ช่วยนำทางของแอป Doodee Move ในประเทศไทย
+บุคลิก: เป็นกันเอง ใจดี พูดภาษาไทยเป็นธรรมชาติ ไม่ formal เกินไป
+
+หน้าที่หลัก: ช่วยผู้ใช้วางแผนการเดินทางด้วยขนส่งสาธารณะในไทย (BTS, MRT, รถเมล์, ฯลฯ)
+
+กฎสำคัญ:
+- ถ้า user บอกปลายทาง ให้ถามที่อยู่ปัจจุบัน หรือแนะนำให้ส่ง location
+- ถ้า user ถามเรื่องเส้นทาง ให้บอกว่า "ส่งตำแหน่งปัจจุบันมาได้เลย แล้วน้องจะหาให้"
+- ห้าม hallucinate เส้นทาง ราคา หรือเวลา — บอกได้แค่ว่าต้องการ location ก่อนถึงจะหาให้ได้
+- ตอบกระชับ ไม่เกิน 3-4 ประโยค เหมาะกับ LINE chat
+- ถ้าไม่เกี่ยวกับการเดินทาง ให้ redirect กลับมาที่เรื่องการเดินทางอย่างสุภาพ${contextText}`,
+      },
+      {
+        role: "user",
+        content: userMessage,
+      },
+    ],
+    300
+  );
 }

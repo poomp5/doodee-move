@@ -15,7 +15,7 @@ import { getSession, setSession, clearSession } from "@/lib/session";
 import { getRoutes, geocodePlace, getNearestTrainStationByKeyword, isInThailand, getNearbyRestaurants } from "@/lib/maps";
 import { calcCo2Saved } from "@/lib/carbon";
 import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex, buildRouteRatingFlex, buildRestaurantsFlex } from "@/lib/flex";
-import { parseUserIntent } from "@/lib/typhoon";
+import { parseUserIntent, chatWithDoodee } from "@/lib/typhoon";
 
 type PendingFeedbackData = {
   tripId?: string;
@@ -271,6 +271,17 @@ async function handleEvent(event: WebhookEvent) {
           type: "text",
           text: `✅ ยกเลิกและเริ่มใหม่แล้ว\n\nส่งตำแหน่งของคุณเพื่อเริ่มค้นหาเส้นทาง หรือกดเมนูด้านล่างเพื่อเลือกฟีเจอร์อื่นๆ${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
         }]);
+        return;
+      }
+
+      // --- Rich menu: "คุยกับน้องดูดี" → เปิด chat mode ---
+      if (text === "คุยกับน้องดูดี") {
+        await clearSession(lineUserId);
+        await showTyping(lineUserId, 5);
+        const reply = await chatWithDoodee("สวัสดี แนะนำตัวให้หน่อย แล้วถามว่าจะไปไหน", {
+          displayName: user.displayName,
+        });
+        await safeReply(replyToken, [{ type: "text", text: reply }]);
         return;
       }
 
@@ -782,11 +793,24 @@ async function handleEvent(event: WebhookEvent) {
       return;
     }
 
-    // Default message
-    await safeReply(replyToken, [{
-      type: "text",
-      text: `สวัสดีครับ! 🌿 Doodee Move\n\nยินดีต้อนรับสู่แอปจัดการการเดินทาง\n\nกดเมนูด้านล่างเพื่อเลือกฟีเจอร์:\n\n🚌 วิธีการเดินทาง - คำแนะนำการใช้งาน\n🚇 สถานีรถไฟใกล้ฉัน - ค้นหาสถานีใกล้ๆ คุณ\n🗺️ สร้างแผนที่ - ช่วยเพิ่มข้อมูลขนส่งสาธารณะ\n\nต้องการเริ่มใหม่? พิมพ์ "ยกเลิก"\n\nทุกการเดินทางของคุณช่วยลด CO2 ให้โลก${SHOW_BOT_VERSION ? `\n\n(Bot v${BOT_VERSION})` : ''}`,
-    }]);
+    // Default — ให้ Typhoon ตอบแบบ conversational แทน hardcode message
+    try {
+      await showTyping(lineUserId, 5);
+      const reply = await chatWithDoodee(
+        msg.type === "text" ? (msg.text ?? "") : "สวัสดี",
+        {
+          displayName: user.displayName,
+          sessionStep: session?.step,
+          destLabel: session?.destLabel ?? undefined,
+        }
+      );
+      await safeReply(replyToken, [{ type: "text", text: reply }]);
+    } catch {
+      await safeReply(replyToken, [{
+        type: "text",
+        text: `สวัสดีครับ! 🌿 Doodee Move\n\nส่งตำแหน่งปัจจุบัน หรือพิมพ์ว่าจะไปไหน เช่น "อยากไปสยาม" ได้เลย`,
+      }]);
+    }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errStack = error instanceof Error ? error.stack : undefined;
