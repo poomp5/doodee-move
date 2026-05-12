@@ -12,10 +12,10 @@ const SHOW_BOT_VERSION = false; // Toggle to show/hide bot version in messages
 type WebhookEvent = any;
 import { getPrisma } from "@/lib/prisma";
 import { getSession, setSession, clearSession } from "@/lib/session";
-import { getRoutes, parseThaiDirectionText, geocodePlace, getNearestTrainStationByKeyword, isInThailand, getNearbyRestaurants } from "@/lib/maps";
+import { getRoutes, geocodePlace, getNearestTrainStationByKeyword, isInThailand, getNearbyRestaurants } from "@/lib/maps";
 import { calcCo2Saved } from "@/lib/carbon";
 import { buildRoutesFlexMessage, buildRouteDetailFlex, buildTrainStationDetailFlex, buildPDPAConsentFlex, buildRouteRatingFlex, buildRestaurantsFlex } from "@/lib/flex";
-import { recommendBestRoute } from "@/lib/typhoon";
+import { recommendBestRoute, parseUserIntent } from "@/lib/typhoon";
 
 type PendingFeedbackData = {
   tripId?: string;
@@ -387,53 +387,66 @@ async function handleEvent(event: WebhookEvent) {
         return;
       }
 
-      const parsed = parseThaiDirectionText(text);
-      
-      if (parsed) {
-        // User wants to find a route using text-based input
-        const originText = parsed.origin;
-        const destText = parsed.destination;
-        
+      // ใช้ Typhoon วิเคราะห์ intent แทน regex เพื่อรองรับประโยคเป็นธรรมชาติ เช่น "อยากไปจุฬา"
+      const intent = await parseUserIntent(text);
+
+      if (intent.type === "origin_and_destination" || intent.type === "destination_only") {
+        const destText = intent.destination;
+
+        // destination_only: ถ้ามี session origin ใช้ได้เลย ถ้าไม่มีต้องถาม
+        if (intent.type === "destination_only" && !session?.originLat) {
+          await setSession({ lineUserId, step: "WAITING_DESTINATION", destLabel: destText });
+          await safeReply(replyToken, [{
+            type: "text",
+            text: `📍 ส่งตำแหน่งปัจจุบันของคุณมาก่อนนะ แล้วจะพาไป${destText} เลย`,
+          }]);
+          return;
+        }
+
+        const originText = intent.type === "origin_and_destination"
+          ? intent.origin
+          : "ตำแหน่งปัจจุบัน";
+
         try {
-          // Geocode both origin and destination
-          const originGeocode = await geocodePlace(originText);
-          if (!originGeocode) {
-            await safeReply(
-              replyToken,
-              [{ type: "text", text: `ไม่พบสถานที่ต้นทาง "${originText}" ลองพิมพ์ใหม่หรือส่งตำแหน่งต้นทางแทนนะ` }]
-            );
-            return;
+          let originLat: number, originLng: number;
+
+          if (intent.type === "origin_and_destination") {
+            const originGeocode = await geocodePlace(intent.origin);
+            if (!originGeocode) {
+              await safeReply(replyToken, [{ type: "text", text: `ไม่พบสถานที่ต้นทาง "${intent.origin}" ลองพิมพ์ใหม่หรือส่งตำแหน่งต้นทางแทนนะ` }]);
+              return;
+            }
+            originLat = originGeocode.lat;
+            originLng = originGeocode.lng;
+          } else {
+            // destination_only + มี session origin
+            originLat = session!.originLat!;
+            originLng = session!.originLng!;
           }
 
           const destGeocode = await geocodePlace(destText);
           if (!destGeocode) {
-            await safeReply(
-              replyToken,
-              [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่งตำแหน่งปลายทางแทนนะ` }]
-            );
+            await safeReply(replyToken, [{ type: "text", text: `ไม่พบสถานที่ปลายทาง "${destText}" ลองพิมพ์ใหม่หรือส่งตำแหน่งปลายทางแทนนะ` }]);
             return;
           }
 
-          // หาเส้นทาง
-          const routes = await getRoutes(originGeocode.lat, originGeocode.lng, destGeocode.lat, destGeocode.lng);
+          const routes = await getRoutes(originLat, originLng, destGeocode.lat, destGeocode.lng);
           if (routes.length === 0) {
             await safeReply(replyToken, [{ type: "text", text: "ขออภัย ไม่พบเส้นทางขนส่งสาธารณะหรือทางเลือกสีเขียวในพื้นที่นี้" }]);
             return;
           }
 
-          // store session state
           await setSession({
             lineUserId,
             step: "AWAITING_ROUTE",
-            originLat: originGeocode.lat,
-            originLng: originGeocode.lng,
+            originLat,
+            originLng,
             destLat: destGeocode.lat,
             destLng: destGeocode.lng,
             destLabel: destText,
             pendingRoutes: routes,
           });
 
-          // send Typhoon recommendation + flex carousel
           const flexMsg = buildRoutesFlexMessage(routes, destText) as any;
           const typhoonMsg = await buildTyphoonRecommendation(routes, originText, destText);
           const replyMsgs = typhoonMsg ? [typhoonMsg, flexMsg] : [flexMsg];

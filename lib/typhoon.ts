@@ -41,6 +41,55 @@ async function callTyphoon(
   return data.choices[0]?.message?.content?.trim() ?? "";
 }
 
+export type ParsedIntent =
+  | { type: "destination_only"; destination: string }
+  | { type: "origin_and_destination"; origin: string; destination: string }
+  | { type: "unknown" };
+
+/**
+ * ให้ Typhoon วิเคราะห์ว่า user พิมพ์อะไรมา — บอกแค่ปลายทาง หรือ origin+dest
+ * ตัวอย่าง:
+ *   "อยากไปจุฬา"          → destination_only: "จุฬาลงกรณ์มหาวิทยาลัย"
+ *   "เดอะมอลไปสยาม"       → origin_and_destination
+ *   "จากบ้านไปออฟฟิศ"     → origin_and_destination
+ *   "ร้านกาแฟใกล้ๆ"       → unknown (ไม่ใช่ direction request)
+ */
+export async function parseUserIntent(text: string): Promise<ParsedIntent> {
+  try {
+    const result = await callTyphoon(
+      [
+        {
+          role: "system",
+          content: `คุณช่วยวิเคราะห์ข้อความจากผู้ใช้แอปนำทางในไทย แล้วตอบเป็น JSON เท่านั้น ห้ามตอบอย่างอื่น
+
+รูปแบบ JSON ที่ต้องตอบ (เลือก 1 แบบ):
+1. ถ้าบอกแค่ปลายทาง: {"type":"destination_only","destination":"ชื่อสถานที่ปลายทาง"}
+2. ถ้าบอกทั้งต้นทางและปลายทาง: {"type":"origin_and_destination","origin":"ต้นทาง","destination":"ปลายทาง"}
+3. ถ้าไม่ใช่คำถามเกี่ยวกับการเดินทาง: {"type":"unknown"}
+
+กฎ:
+- ชื่อสถานที่ให้เขียนให้ครบ เช่น "จุฬา" → "จุฬาลงกรณ์มหาวิทยาลัย", "เดอะมอล" → "The Mall"
+- คำว่า "อยาก", "ต้องการ", "จะ", "ขอ" ไม่ใช่ชื่อสถานที่
+- ตอบ JSON เท่านั้น ห้ามมีข้อความอื่น`,
+        },
+        {
+          role: "user",
+          content: text,
+        },
+      ],
+      120
+    );
+
+    const cleaned = result.replace(/```json\n?|\n?```/g, "").trim();
+    const parsed = JSON.parse(cleaned) as ParsedIntent;
+    console.log(`[typhoon] parseUserIntent "${text}" →`, parsed);
+    return parsed;
+  } catch (err) {
+    console.error(`[typhoon] parseUserIntent failed for "${text}"`, err);
+    return { type: "unknown" };
+  }
+}
+
 /**
  * Normalize ชื่อสถานที่ไทยที่พิมพ์ย่อ/ผิดสะกด ให้ Google Maps หาเจอ
  * ใช้ความรู้ทั่วไปของ Typhoon เกี่ยวกับสถานที่ในไทย (ไม่ใช่ route data)
