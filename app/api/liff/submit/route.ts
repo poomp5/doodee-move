@@ -1,7 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 export const maxDuration = 30;
+
+async function uploadToR2(imageBase64: string, lineUserId: string): Promise<string> {
+  const accountId = process.env.R2_ACCOUNT_ID!;
+  const s3 = new S3Client({
+    region: "auto",
+    endpoint: process.env.R2_ENDPOINT || `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+    },
+  });
+
+  const filename = `doodee/move/${lineUserId}/liff-${Date.now()}.jpg`;
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME!,
+      Key: filename,
+      Body: Buffer.from(imageBase64, "base64"),
+      ContentType: "image/jpeg",
+    })
+  );
+
+  const base = process.env.R2_PUBLIC_URL ?? `https://pub-${accountId}.r2.dev`;
+  return `${base}/${filename}`;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,25 +38,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // Upload image to R2 via existing upload endpoint
-    const uploadRes = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || "https://dmove.site"}/api/upload-image`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64,
-          lineUserId: lineUserId ?? "liff-anonymous",
-          messageId: `liff-${Date.now()}`,
-        }),
-      }
-    );
-
-    if (!uploadRes.ok) {
-      throw new Error("Image upload failed");
-    }
-
-    const { imageUrl } = await uploadRes.json();
+    const imageUrl = await uploadToR2(imageBase64, lineUserId ?? "liff-anonymous");
 
     const prisma = getPrisma();
     await prisma.transitSubmission.create({
