@@ -30,6 +30,7 @@ async function callTyphoon(
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
+    signal: AbortSignal.timeout(8000), // 8s max — LINE reply token expires in ~30s, leave room for other ops
     body: JSON.stringify({
       model: "typhoon-v2.5-30b-a3b-instruct",
       messages,

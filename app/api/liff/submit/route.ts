@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/prisma";
 
+export const maxDuration = 30;
+
 export async function POST(req: NextRequest) {
   try {
     const { lineUserId, displayName, imageBase64, latitude, longitude, description } =

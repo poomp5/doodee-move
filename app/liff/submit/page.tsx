@@ -65,12 +65,26 @@ export default function LiffSubmitPage() {
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = (reader.result as string).split(",")[1];
+
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      // resize ให้ไม่เกิน 1280px และ compress เป็น jpeg 0.75
+      const MAX = 1280;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+        else { width = Math.round((width * MAX) / height); height = MAX; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+      const base64 = canvas.toDataURL("image/jpeg", 0.75).split(",")[1];
       setPhoto(base64);
     };
-    reader.readAsDataURL(file);
+    img.src = objectUrl;
   }
 
   function handleRequestLocation() {
