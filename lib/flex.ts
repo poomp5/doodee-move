@@ -803,6 +803,21 @@ export function buildRestaurantsFlex(restaurants: RestaurantResult[]): FlexMessa
     const bubble: FlexBubble = {
       type: "bubble",
       size: "micro",
+      header: {
+        type: "box",
+        layout: "vertical",
+        contents: [
+          {
+            type: "text",
+            text: "ร้านอาหารใกล้เคียง",
+            size: "xs",
+            color: "#ffffff",
+            weight: "bold",
+          },
+        ],
+        backgroundColor: primaryColor,
+        paddingAll: "8px",
+      },
       body: {
         type: "box",
         layout: "vertical",

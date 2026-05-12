@@ -422,17 +422,13 @@ export async function getNearbyRestaurants(
           const restaurantLng = result.geometry.location.lng;
           const distance = calculateDistance(lat, lng, restaurantLat, restaurantLng);
 
-          // Always use static map for reliability with LINE messages
-          const photoUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${restaurantLat},${restaurantLng}&zoom=16&size=400x300&maptype=roadmap&markers=color:red%7C${restaurantLat},${restaurantLng}&key=${key}`;
-          console.log(`[getNearbyRestaurants] Generated map for ${result.name}: ${photoUrl}`);
-
           restaurants.push({
             name: result.name,
             rating: result.rating,
             lat: restaurantLat,
             lng: restaurantLng,
             distanceKm: distance,
-            photoUrl,
+            photoUrl: undefined,
             openNow: result.opening_hours?.open_now,
             address: result.vicinity,
             placeId: result.place_id,
