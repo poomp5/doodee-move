@@ -1141,6 +1141,8 @@ async function handlePostback(event: WebhookEvent) {
         lineUserId,
         chosenMode: chosen.mode,
       });
+      // Clear session so user isn't stuck at AWAITING_ROUTE
+      try { await clearSession(lineUserId); } catch { /* ignore */ }
       // Still try to reply to LINE even if database operations fail
       try {
         console.log("[webhook] Attempting fallback reply to LINE");
