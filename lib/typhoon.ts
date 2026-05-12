@@ -11,7 +11,10 @@ type TyphoonResponse = {
   choices: { message: { content: string } }[];
 };
 
-async function callTyphoon(messages: TyphoonMessage[]): Promise<string> {
+async function callTyphoon(
+  messages: TyphoonMessage[],
+  maxTokens = 500
+): Promise<string> {
   const apiKey = process.env.TYPHOON;
   if (!apiKey) throw new Error("TYPHOON API key not configured");
 
@@ -22,9 +25,9 @@ async function callTyphoon(messages: TyphoonMessage[]): Promise<string> {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "typhoon-v2.1-12b-instruct",
+      model: "typhoon-v2.5-30b-a3b-instruct",
       messages,
-      max_tokens: 500,
+      max_tokens: maxTokens,
       temperature: 0.3,
     }),
   });
@@ -39,6 +42,45 @@ async function callTyphoon(messages: TyphoonMessage[]): Promise<string> {
 }
 
 /**
+ * Normalize ชื่อสถานที่ไทยที่พิมพ์ย่อ/ผิดสะกด ให้ Google Maps หาเจอ
+ * ใช้ความรู้ทั่วไปของ Typhoon เกี่ยวกับสถานที่ในไทย (ไม่ใช่ route data)
+ * return ชื่อที่ normalize แล้ว หรือชื่อเดิมถ้า Typhoon ล้มเหลว
+ */
+export async function normalizePlaceName(placeName: string): Promise<string> {
+  try {
+    const result = await callTyphoon(
+      [
+        {
+          role: "system",
+          content: `คุณช่วย normalize ชื่อสถานที่ในประเทศไทยให้ Google Maps ค้นหาได้
+กฎ:
+- ตอบแค่ชื่อสถานที่ที่ normalize แล้ว ไม่ต้องอธิบาย
+- ถ้าเป็นชื่อย่อ ให้เป็นชื่อเต็ม เช่น "เดอะมอล" → "The Mall"
+- ถ้าสะกดผิด ให้แก้ให้ถูก เช่น "สยามพารา" → "Siam Paragon"
+- ถ้าชื่อถูกแล้วหรือไม่รู้จัก ให้ตอบชื่อเดิมกลับมา
+- ตอบเป็นภาษาไทยหรืออังกฤษตามที่เหมาะสมกับ Google Maps`,
+        },
+        {
+          role: "user",
+          content: `normalize ชื่อสถานที่นี้: "${placeName}"`,
+        },
+      ],
+      50
+    );
+
+    const normalized = result.trim().replace(/^["']|["']$/g, "");
+    if (normalized && normalized.length > 0) {
+      console.log(`[typhoon] normalizePlaceName "${placeName}" → "${normalized}"`);
+      return normalized;
+    }
+    return placeName;
+  } catch (err) {
+    console.error(`[typhoon] normalizePlaceName failed for "${placeName}", using original`, err);
+    return placeName;
+  }
+}
+
+/**
  * อธิบาย route summary เป็นภาษาไทยที่เข้าใจง่าย
  * ใช้เฉพาะข้อมูลจาก Google Maps ที่ได้รับมา ห้าม hallucinate
  */
@@ -49,16 +91,20 @@ export async function explainRoute(
 ): Promise<string> {
   const stepsText = route.steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
 
-  const systemPrompt = `คุณคือผู้ช่วยนำทางของ Doodee Move แอปขนส่งสาธารณะในประเทศไทย
+  const explanation = await callTyphoon([
+    {
+      role: "system",
+      content: `คุณคือผู้ช่วยนำทางของ Doodee Move แอปขนส่งสาธารณะในประเทศไทย
 
 กฎสำคัญที่ต้องปฏิบัติอย่างเคร่งครัด:
 - ใช้เฉพาะข้อมูลที่ได้รับใน context เท่านั้น ห้ามเพิ่มข้อมูลที่ไม่มีในข้อมูลที่ให้ไว้
 - ห้าม hallucinate ราคา, เวลา, หรือสถานีที่ไม่ได้ระบุใน context
 - ถ้าข้อมูลไม่ชัดเจน ให้บอกตามที่มีเท่านั้น อย่าเดา
-- ตอบเป็นภาษาไทยที่เป็นธรรมชาติ สั้น กระชับ เหมาะสำหรับ LINE chat
-- ไม่ต้องใส่ emoji มากเกินไป`;
-
-  const userPrompt = `ข้อมูลเส้นทางจาก Google Maps (ข้อมูลจริง):
+- ตอบเป็นภาษาไทยที่เป็นธรรมชาติ สั้น กระชับ เหมาะสำหรับ LINE chat`,
+    },
+    {
+      role: "user",
+      content: `ข้อมูลเส้นทางจาก Google Maps (ข้อมูลจริง):
 - ต้นทาง: ${originLabel}
 - ปลายทาง: ${destLabel}
 - วิธีเดินทาง: ${route.label}
@@ -68,11 +114,8 @@ export async function explainRoute(
 ขั้นตอนการเดินทาง:
 ${stepsText}
 
-โปรดอธิบายเส้นทางนี้เป็นภาษาไทยที่เข้าใจง่ายสำหรับผู้ใช้ทั่วไป ใช้ข้อมูลข้างต้นเท่านั้น อธิบายแบบกระชับ 2-4 ประโยค`;
-
-  const explanation = await callTyphoon([
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
+อธิบายเส้นทางนี้เป็นภาษาไทยที่เข้าใจง่ายสำหรับผู้ใช้ทั่วไป ใช้ข้อมูลข้างต้นเท่านั้น อธิบายแบบกระชับ 2-4 ประโยค`,
+    },
   ]);
 
   return explanation;
@@ -94,27 +137,28 @@ export async function recommendBestRoute(
     )
     .join("\n");
 
-  const systemPrompt = `คุณคือผู้ช่วยนำทางของ Doodee Move แอปขนส่งสาธารณะในประเทศไทย
+  const recommendation = await callTyphoon([
+    {
+      role: "system",
+      content: `คุณคือผู้ช่วยนำทางของ Doodee Move แอปขนส่งสาธารณะในประเทศไทย
 
 กฎสำคัญที่ต้องปฏิบัติอย่างเคร่งครัด:
 - ใช้เฉพาะข้อมูลที่ได้รับใน context เท่านั้น ห้ามเพิ่มข้อมูลที่ไม่มีในข้อมูลที่ให้ไว้
 - ห้าม hallucinate ราคา, เวลา, หรือสถานีที่ไม่ได้ระบุใน context
 - แนะนำตามข้อมูลระยะทางและเวลาจริงที่มีเท่านั้น
-- ตอบเป็นภาษาไทยที่เป็นธรรมชาติ สั้น กระชับ เหมาะสำหรับ LINE chat
-- ไม่ต้องใส่ emoji มากเกินไป`;
-
-  const userPrompt = `ข้อมูลเส้นทางทั้งหมดจาก Google Maps (ข้อมูลจริง):
+- ตอบเป็นภาษาไทยที่เป็นธรรมชาติ สั้น กระชับ เหมาะสำหรับ LINE chat`,
+    },
+    {
+      role: "user",
+      content: `ข้อมูลเส้นทางทั้งหมดจาก Google Maps (ข้อมูลจริง):
 - ต้นทาง: ${originLabel}
 - ปลายทาง: ${destLabel}
 
 ตัวเลือกเส้นทาง:
 ${routeSummaries}
 
-โปรดแนะนำเส้นทางที่เหมาะสมที่สุดสำหรับขนส่งสาธารณะ โดยใช้ข้อมูลข้างต้นเท่านั้น อธิบายแบบกระชับ 1-2 ประโยค`;
-
-  const recommendation = await callTyphoon([
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
+แนะนำเส้นทางที่เหมาะสมที่สุดสำหรับขนส่งสาธารณะ โดยใช้ข้อมูลข้างต้นเท่านั้น อธิบายแบบกระชับ 1-2 ประโยค`,
+    },
   ]);
 
   return recommendation;

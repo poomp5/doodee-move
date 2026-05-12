@@ -925,8 +925,7 @@ async function handlePostback(event: WebhookEvent) {
 
   if (data.startsWith("route=")) {
     const mode = data.slice("route=".length);
-    const session = await getSession(lineUserId);
-    
+
     console.log("[webhook] Route selection postback", {
       lineUserId,
       requestedMode: mode,
@@ -1180,7 +1179,7 @@ async function buildTyphoonRecommendation(
   try {
     const recommendation = await recommendBestRoute(routes, originLabel, destLabel);
     if (!recommendation) return null;
-    return { type: "text", text: `🤖 คำแนะนำ:\n${recommendation}` };
+    return { type: "text", text: `${recommendation}\n\n(ตอบอัตโนมัติจาก Typhoon)` };
   } catch (err) {
     console.error("[typhoon] recommendBestRoute failed, skipping", err);
     return null;

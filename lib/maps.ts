@@ -4,6 +4,7 @@ import {
   TransitMode,
   Language,
 } from "@googlemaps/google-maps-services-js";
+import { normalizePlaceName } from "./typhoon";
 
 const mapsClient = new Client({});
 
@@ -240,11 +241,14 @@ export function parseThaiDirectionText(text: string): { origin: string; destinat
  * Geocode a place name to coordinates using Google Geocoding API
  */
 export async function geocodePlace(placeName: string): Promise<{ lat: number; lng: number } | null> {
+  // Normalize ชื่อสถานที่ผ่าน Typhoon ก่อน geocode เพื่อรองรับชื่อย่อ/สะกดผิด
+  const normalizedName = await normalizePlaceName(placeName);
+
   try {
     const key = process.env.GOOGLE_MAPS_API_KEY!;
     const res = await mapsClient.geocode({
       params: {
-        address: placeName,
+        address: normalizedName,
         language: Language.th,
         region: "th",
         bounds: THAILAND_BOUNDS,
@@ -265,13 +269,13 @@ export async function geocodePlace(placeName: string): Promise<{ lat: number; ln
 
     const result = results[0] ?? res.data.results[0];
     if (!result) return null;
-    console.log(`[geocodePlace] "${placeName}" → (${result.geometry.location.lat}, ${result.geometry.location.lng}) — ${result.formatted_address}`);
+    console.log(`[geocodePlace] "${placeName}" (normalized: "${normalizedName}") → (${result.geometry.location.lat}, ${result.geometry.location.lng}) — ${result.formatted_address}`);
     return {
       lat: result.geometry.location.lat,
       lng: result.geometry.location.lng,
     };
   } catch (err) {
-    console.error(`[geocodePlace] Error geocoding "${placeName}":`, err);
+    console.error(`[geocodePlace] Error geocoding "${placeName}" (normalized: "${normalizedName}"):`, err);
     return null;
   }
 }
