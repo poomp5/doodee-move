@@ -739,107 +739,56 @@ export function buildRouteRatingFlex(routeMode: string, destLabel: string): Flex
 
 export function buildRestaurantsFlex(restaurants: RestaurantResult[]): FlexMessage {
   const primaryColor = "#2a9c64";
-  const bubbles: FlexBubble[] = restaurants.map((restaurant) => {
-    const ratingStars = restaurant.rating 
-      ? "⭐".repeat(Math.floor(restaurant.rating)) + (restaurant.rating % 1 >= 0.5 ? "⭐" : "")
-      : "ไม่มีข้อมูลการจัดอันดับ";
+  // Limit to max 2 restaurants to avoid LINE message size/complexity limits
+  const limitedRestaurants = restaurants.slice(0, 2);
+  
+  const bubbles: FlexBubble[] = limitedRestaurants.map((restaurant) => {
+    const ratingText = restaurant.rating 
+      ? `${restaurant.rating.toFixed(1)} ⭐`
+      : "ไม่มีข้อมูล";
     
+    // Simplified body contents - only essential info
     const bodyContents: any[] = [
       {
         type: "text",
         text: restaurant.name,
         weight: "bold",
-        size: "lg",
+        size: "md",
         color: "#333333",
         wrap: true,
       },
-    ];
-
-    // Add photo if available
-    if (restaurant.photoUrl) {
-      bodyContents.push({
-        type: "image",
-        url: restaurant.photoUrl,
-        size: "full",
-        aspectRatio: "4:3",
-        aspectMode: "cover",
-        margin: "md",
-        backgroundColor: "#f5f5f5",
-      });
-    } else {
-      // Fallback image - restaurant icon
-      bodyContents.push({
-        type: "box",
-        layout: "vertical",
-        height: "120px",
-        backgroundColor: "#f8f9fa",
-        cornerRadius: "8px",
-        margin: "md",
-        contents: [
-          {
-            type: "text",
-            text: "🍽️",
-            size: "xxl",
-            align: "center",
-            flex: 1,
-          },
-        ],
-        justifyContent: "center",
-      });
-    }
-
-    // Add rating and price info
-    const ratingInfo = [];
-    if (restaurant.rating) {
-      ratingInfo.push(`${restaurant.rating.toFixed(1)} ⭐`);
-    }
-    if (restaurant.priceLevel !== undefined) {
-      const priceSymbols = '💰'.repeat(restaurant.priceLevel + 1);
-      ratingInfo.push(priceSymbols);
-    }
-
-    if (ratingInfo.length > 0) {
-      bodyContents.push({
+      {
+        type: "text",
+        text: ratingText,
+        size: "sm",
+        color: "#ff8800",
+        margin: "sm",
+      },
+      {
         type: "box",
         layout: "horizontal",
-        spacing: "md",
-        margin: "md",
+        spacing: "sm",
+        margin: "sm",
         contents: [
           {
             type: "text",
-            text: ratingInfo.join(" • "),
-            size: "sm",
+            text: `📍 ${restaurant.distanceKm.toFixed(1)} km`,
+            size: "xs",
             color: "#666666",
-            flex: 1,
+            flex: 0,
+          },
+          {
+            type: "text",
+            text: restaurant.openNow !== undefined ? (restaurant.openNow ? "🟢 Open" : "🔴 Closed") : "",
+            size: "xs",
+            color: restaurant.openNow ? "#2a9c64" : "#999999",
+            flex: 0,
+            margin: "md",
           },
         ],
-      });
-    }
+      },
+    ];
 
-    // Add distance and status
-    const statusInfo = [];
-    statusInfo.push(`📍 ${restaurant.distanceKm.toFixed(1)} km`);
-    if (restaurant.openNow !== undefined) {
-      statusInfo.push(restaurant.openNow ? "🟢 เปิดอยู่" : "🔴 ปิดแล้ว");
-    }
-
-    bodyContents.push({
-      type: "box",
-      layout: "horizontal",
-      spacing: "md",
-      margin: "md",
-      contents: [
-        {
-          type: "text",
-          text: statusInfo.join(" • "),
-          size: "xs",
-          color: "#666666",
-          flex: 1,
-        },
-      ],
-    });
-
-    // Add address if available
     if (restaurant.address) {
       bodyContents.push({
         type: "text",
@@ -847,60 +796,19 @@ export function buildRestaurantsFlex(restaurants: RestaurantResult[]): FlexMessa
         size: "xs",
         color: "#666666",
         wrap: true,
-        margin: "md",
+        margin: "sm",
       });
     }
 
-    // Add restaurant type if available
-    if (restaurant.types && restaurant.types.length > 0) {
-      const relevantTypes = restaurant.types
-        .filter(type => !['restaurant', 'food', 'point_of_interest', 'establishment'].includes(type))
-        .slice(0, 2); // Show max 2 types
-      
-      if (relevantTypes.length > 0) {
-        bodyContents.push({
-          type: "text",
-          text: `🏷️ ${relevantTypes.join(", ")}`,
-          size: "xs",
-          color: "#888888",
-          margin: "md",
-        });
-      }
-    }
-
-    return {
+    const bubble: FlexBubble = {
       type: "bubble",
-      size: "kilo",
-      header: {
-        type: "box",
-        layout: "vertical",
-        contents: [
-          {
-            type: "text",
-            text: "🍽️",
-            size: "xl",
-            align: "center",
-          },
-          {
-            type: "text",
-            text: "ร้านอาหารใกล้เคียง",
-            weight: "bold",
-            size: "lg",
-            color: "#ffffff",
-            align: "center",
-            margin: "md",
-          },
-        ],
-        backgroundColor: primaryColor,
-        paddingAll: "16px",
-        spacing: "sm",
-      },
+      size: "micro",
       body: {
         type: "box",
         layout: "vertical",
-        spacing: "md",
+        spacing: "sm",
         contents: bodyContents,
-        paddingAll: "16px",
+        paddingAll: "12px",
       },
       footer: {
         type: "box",
@@ -911,17 +819,29 @@ export function buildRestaurantsFlex(restaurants: RestaurantResult[]): FlexMessa
             type: "button",
             action: {
               type: "uri",
-              label: "🗺️ นำทาง",
-              uri: `https://www.google.com/maps/dir/?api=1&destination=${restaurant.lat},${restaurant.lng}${restaurant.placeId ? `&destination_place_id=${encodeURIComponent(restaurant.placeId)}` : ""}`,
+              label: "🗺️ Navigate",
+              uri: `https://www.google.com/maps?q=${restaurant.lat},${restaurant.lng}`,
             },
             style: "primary",
             color: primaryColor,
             height: "sm",
           },
         ],
-        paddingAll: "12px",
+        paddingAll: "8px",
       },
     };
+
+    if (restaurant.photoUrl) {
+      bubble.hero = {
+        type: "image",
+        url: restaurant.photoUrl,
+        size: "full",
+        aspectRatio: "20:13",
+        aspectMode: "cover",
+      };
+    }
+
+    return bubble;
   });
 
   return {

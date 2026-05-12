@@ -398,50 +398,52 @@ export async function getNearbyRestaurants(
   }
 
   async function fetchNearby(radius: number) {
-    const res = await mapsClient.placesNearby({
-      params: {
-        location: { lat, lng },
-        radius,
-        type: "restaurant",
-        language: Language.th,
-        key,
-      },
-    });
+    if (!key) {
+      console.warn("[getNearbyRestaurants] Missing API key in fetchNearby");
+      return;
+    }
+    
+    try {
+      const res = await mapsClient.placesNearby({
+        params: {
+          location: { lat, lng },
+          radius,
+          type: "restaurant",
+          language: Language.th,
+          key,
+        },
+      });
 
-    if (res.data.results && res.data.results.length > 0) {
-      for (const result of res.data.results) {
-        if (!result.geometry || !result.name) continue;
+      if (res.data.results && res.data.results.length > 0) {
+        for (const result of res.data.results) {
+          if (!result.geometry || !result.name) continue;
 
-        const restaurantLat = result.geometry.location.lat;
-        const restaurantLng = result.geometry.location.lng;
-        const distance = calculateDistance(lat, lng, restaurantLat, restaurantLng);
+          const restaurantLat = result.geometry.location.lat;
+          const restaurantLng = result.geometry.location.lng;
+          const distance = calculateDistance(lat, lng, restaurantLat, restaurantLng);
 
-        let photoUrl: string | undefined;
-        if (result.photos && result.photos.length > 0) {
-          const photo = result.photos[0];
-          // Construct photo URL with proper parameters
-          photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&maxheight=300&photo_reference=${photo.photo_reference}&key=${key}`;
-          console.log(`[getNearbyRestaurants] Photo found for ${result.name}: ${photoUrl}`);
-        } else {
-          console.log(`[getNearbyRestaurants] No photo available for ${result.name}, using map fallback`);
-          // Fallback: Generate a static map image showing restaurant location
-          photoUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${restaurantLat},${restaurantLng}&zoom=18&size=400x300&maptype=roadmap&markers=color:red%7Clabel:R%7C${restaurantLat},${restaurantLng}&key=${key}`;
+          // Always use static map for reliability with LINE messages
+          const photoUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${restaurantLat},${restaurantLng}&zoom=16&size=400x300&maptype=roadmap&markers=color:red%7C${restaurantLat},${restaurantLng}&key=${key}`;
+          console.log(`[getNearbyRestaurants] Generated map for ${result.name}: ${photoUrl}`);
+
+          restaurants.push({
+            name: result.name,
+            rating: result.rating,
+            lat: restaurantLat,
+            lng: restaurantLng,
+            distanceKm: distance,
+            photoUrl,
+            openNow: result.opening_hours?.open_now,
+            address: result.vicinity,
+            placeId: result.place_id,
+            priceLevel: result.price_level,
+            types: result.types,
+          });
         }
-
-        restaurants.push({
-          name: result.name,
-          rating: result.rating,
-          lat: restaurantLat,
-          lng: restaurantLng,
-          distanceKm: distance,
-          photoUrl,
-          openNow: result.opening_hours?.open_now,
-          address: result.vicinity,
-          placeId: result.place_id,
-          priceLevel: result.price_level,
-          types: result.types,
-        });
       }
+    } catch (err) {
+      console.error("[getNearbyRestaurants] Error in fetchNearby:", err);
+      throw err;
     }
   }
 
