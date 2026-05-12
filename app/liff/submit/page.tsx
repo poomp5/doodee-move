@@ -87,13 +87,38 @@ export default function LiffSubmitPage() {
     img.src = objectUrl;
   }
 
-  function handleRequestLocation() {
+  async function handleRequestLocation() {
     setLocationError("");
+
+    // LINE in-app browser block geolocation — ต้องเปิด external browser แทน
+    const isInLiffClient = await import("@line/liff")
+      .then(({ default: liff }) => liff.isInClient())
+      .catch(() => false);
+
+    if (isInLiffClient) {
+      // เปิดใน external browser พร้อม flag เพื่อ redirect กลับมา
+      const { default: liff } = await import("@line/liff");
+      liff.openWindow({
+        url: `${window.location.href}&openedExternally=1`,
+        external: true,
+      });
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setLocationError("เบราว์เซอร์นี้ไม่รองรับ Location");
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
       (err) => {
         console.warn("Location error", err);
-        setLocationError("ไม่สามารถรับตำแหน่งได้ กรุณาอนุญาต Location ในการตั้งค่าเบราว์เซอร์");
+        if (err.code === 1) {
+          setLocationError("กรุณาอนุญาต Location แล้วกดใหม่อีกครั้ง");
+        } else {
+          setLocationError("รับตำแหน่งไม่ได้ ลองใหม่อีกครั้ง");
+        }
       },
       { enableHighAccuracy: true, timeout: 15000 }
     );
